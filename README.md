@@ -4,7 +4,7 @@
 
 dB-Deck is a free, open-source (MIT) audio mixer for Windows 11. It aims to combine the simplicity of the Windows Volume Mixer with Voicemeeter-style routing, without artificial strip or bus limits. It has no account, no subscription and no telemetry.
 
-> **Status: early (0.1.0).** The app-volume mixer, managed audio graph, Windows master-volume sync and desktop app work and are tested on real hardware. dB-Deck's **own virtual audio driver is not built yet**. Until it exists, existing virtual cables (VB-Audio, Voicemeeter) can be used as inputs and outputs. See [docs/HANDOFF.md](docs/HANDOFF.md) for exactly what works.
+> **Status: early (0.1.0).** The app-volume mixer, managed audio graph, Windows master-volume sync and desktop app work and are tested on real hardware. dB-Deck's **virtual cable driver builds but has not been installed or tested yet** (it needs a test-signing VM). Meanwhile, existing virtual cables (VB-Audio, Voicemeeter) can be used as inputs and outputs. See [docs/HANDOFF.md](docs/HANDOFF.md) for exactly what works.
 
 ## What works today
 
@@ -21,7 +21,8 @@ dB-Deck is a free, open-source (MIT) audio mixer for Windows 11. It aims to comb
 | Tray: close-to-tray, mute all, profile switch, Main status, exit with warning | ✅ |
 | Engine runs as a separate process; survives UI crashes; UI restarts the engine if it dies | ✅ verified |
 | NSIS installer (per-user) | ✅ builds |
-| dB-Deck virtual audio driver (on-demand endpoints) | ❌ not implemented: see [DRIVER_PLAN](docs/DRIVER_PLAN.md) |
+| dB-Deck virtual cable driver | 🟡 builds (test-signed, InfVerif valid); **not installed or runtime-tested**. See [driver/windows](driver/windows/README.md) |
+| On-demand creation of many virtual devices | ❌ not started (see [DRIVER_PLAN](docs/DRIVER_PLAN.md)) |
 
 ## Layout
 
@@ -34,7 +35,7 @@ engine/              C++20 audio engine
 shared/protocol/     IPC protocol reference
 shared/schemas/      configuration JSON schema
 installer/           NSIS hooks
-driver/windows/      driver notes (no driver code yet)
+driver/windows/      virtual cable driver (WDK, MS-PL, derived from SimpleAudioSample)
 docs/                architecture, decisions, testing, handoff
 scripts/             build scripts and a dev CLI for the engine
 ```
@@ -61,6 +62,12 @@ cd apps/desktop && npm install && npx tauri dev
 
 In dev mode the UI starts `build/engine-Release/dbdeck-engine.exe` automatically.
 
+Driver (needs the WDK; builds and test-signs only, installs nothing):
+
+```bash
+scripts\build-driver.cmd
+```
+
 ## Tests
 
 ```bash
@@ -79,4 +86,4 @@ The Windows integration tests use real devices: they play a quiet tone to a devi
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE). Exception: `driver/windows/dbdeck-vad` is derived from Microsoft sample code and is licensed under MS-PL.

@@ -24,6 +24,13 @@ Machine: Windows 11 Home 10.0.26200, 15 playback / 14 recording endpoints (Realt
 
 Environment variables: `DBDECK_TEST_RENDER_DEVICE` (substring of the device name, default "Dummy Output"), `DBDECK_TEST_SKIP_MASTER=1`.
 
+## Virtual driver (static only)
+- Built with WDK 10.0.28000 / VS 18, warnings as errors: `dbdeckvad.sys`, `.inf`, `.cat` (test-signed).
+- InfVerif `/w`: INF is valid.
+- Code Analysis (driver rules): no warnings in dB-Deck code. Remaining warnings are in unmodified sample code.
+- Engine on this machine: `driver.installed = false`, no false cable pairs among 20 third-party virtual endpoints.
+- Unit test: the recording side of a cable routed into a bus that plays into its playback side is rejected as feedback.
+
 ## Not yet verified
 - Dragging the **Windows 11 Quick Settings** slider itself. The automation tool cannot operate the shell flyout. The same mechanism (an external `IAudioEndpointVolume` change and volume keys) is verified above. Manual check: open dB-Deck, drag Quick Settings, and the toolbar's Windows volume should follow and briefly highlight.
 - Process-loopback app capture end-to-end with a real app, including whether capture is before or after session volume.
@@ -31,4 +38,4 @@ Environment variables: `DBDECK_TEST_RENDER_DEVICE` (substring of the device name
 - End-to-end mic → Main latency in `low` mode.
 - Long-duration stability (hours).
 - Installer install and uninstall on a clean machine (the installer was built, not run).
-- Virtual driver: nothing to test (not implemented).
+- Virtual driver at runtime: install, audio through the cable, stop/start, removal, Driver Verifier. Needs a test-signing VM (see driver/windows/README.md).

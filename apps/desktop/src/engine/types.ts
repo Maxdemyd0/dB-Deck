@@ -113,6 +113,7 @@ export interface Device {
   isDefault: boolean;
   isDefaultComms: boolean;
   likelyVirtual: boolean;
+  dbdeckDriver: boolean;
   format: string;
 }
 
@@ -170,7 +171,14 @@ export interface EngineState {
   devices: Device[];
   availableApps: AvailableApp[];
   windowsVolume: WindowsVolume;
-  driver: { installed: boolean; status: string; message: string; thirdPartyVirtualEndpoints: Device[] };
+  driver: {
+    installed: boolean;
+    status: "installed" | "not-installed";
+    message: string;
+    endpoints: Device[];
+    cablePairs: { recording: string; playback: string }[];
+    thirdPartyVirtualEndpoints: Device[];
+  };
 }
 
 export interface MeterValue {

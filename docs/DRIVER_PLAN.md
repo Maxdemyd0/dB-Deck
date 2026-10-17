@@ -1,52 +1,39 @@
-# Virtual audio driver plan
+# Virtual audio driver
 
-**Status: not implemented.** This build contains no kernel code. The development machine has no Windows Driver Kit (WDK) installed (`Include\<ver>\km\portcls.h` is absent), so no driver could be compiled or tested. Creating a placeholder or mock device would violate the project rules, so none exists. The app works fully without a driver (session control, capture, loopback, routing to any endpoint) and reports `driver.status = "not-available"` honestly in the UI.
+## Status (2026-10-17)
+| Stage | State |
+|---|---|
+| WDK toolchain | WDK 10.0.28000 installed. Stock SimpleAudioSample builds. |
+| dB-Deck driver source (`driver/windows/dbdeck-vad`) | **Written and builds** (test-signed package; InfVerif valid; no code-analysis warnings in dB-Deck code). |
+| Install and runtime test | **Not done.** It needs a test VM or PC with test signing. Nothing was installed on the development workstation. |
+| Engine integration | Done for the user-mode side: driver detection, endpoint listing, cable-pair feedback protection, UI. Endpoints are used through the already-verified WASAPI paths. |
+| Multiple / on-demand cables | Not started (see "Scaling" below). |
+| Production signing | Not started (EV certificate + attestation required). |
 
-The plan below is based on Microsoft's SysVAD sample and the WDK documentation. It has **not** been validated on hardware.
+## Architecture as built: loopback cable
+A PortCls WaveRT miniport derived from Microsoft's **SimpleAudioSample** (MS-PL): one render endpoint ("dB-Deck Virtual Input") and one capture endpoint ("dB-Deck Virtual Output"), both serviced by 1 ms QPC timers (no hardware). The render stream's buffer is copied into a non-paged ring, and the capture stream reads from it.
 
-## 1. Architecture
-A PortCls miniport driver (WaveRT) derived from **SysVAD** (`audio/sysvad` in microsoft/Windows-driver-samples):
-- Each dB-Deck endpoint pair is a WaveRT render miniport and a WaveRT capture miniport with a topology filter. Like SysVAD's "virtual" endpoints, they have no hardware DMA: the cyclic WaveRT buffer is serviced by a timer in the driver.
-- **Playback endpoint** ("dB-Deck Game Input"): apps render into it. The driver copies samples out of the WaveRT buffer into a shared ring that the engine reads.
-- **Recording endpoint** ("dB-Deck Stream Output"): the engine writes bus PCM into a shared ring, and the driver copies it into the capture WaveRT buffer that apps (OBS, Discord) read.
+**Why a cable and not a custom engine↔driver transport** (decision, replacing the IOCTL/shared-memory plan in the original draft):
+- The engine already has verified WASAPI capture/loopback and render paths with drift compensation. With a cable, *App → dB-Deck* is "app plays into Virtual Input, engine loopback-captures Virtual Input", and *dB-Deck → OBS* is "engine renders a bus into Virtual Input, OBS records Virtual Output".
+- No IOCTLs or user-mapped kernel memory means far less attack surface and fewer lifetime hazards.
+- Cost: one extra shared-mode buffer of latency on each path (the Windows audio engine sits between the app and the driver anyway). Both endpoints share one clock, so there is no drift inside the cable.
 
-## 2. Endpoint provisioning
-SysVAD creates its endpoints from static tables (`ENDPOINT_MINIPAIR`) during `StartDevice`. Planned approach: a pool of N pre-declared endpoint pairs, enabled and disabled at runtime with `PcRegisterSubdevice` / `PcUnregisterSubdevice` (or interface enable/disable). The UI's "create virtual device" then activates a slot and names it.
+## Answers to the original research questions
+1. **Driver architecture:** PortCls + WaveRT miniport pairs (wave + topology filter per endpoint), root-enumerated virtual device. The KMDF miniport is used only for PnP/power as in the sample.
+2. **Endpoint provisioning:** subdevices are registered in `StartDevice` from static `ENDPOINT_MINIPAIR` tables (`minipairs.h`).
+3. **Dynamic endpoints:** possible via `PcRegisterSubdevice`/`PcUnregisterSubdevice` at runtime, but the endpoint builder caches endpoints and churn is fragile. **Plan:** a fixed pool of N cable pairs (for example 8) declared in the tables, each enabled or disabled through a registry-backed setting read at start. This is a driver-side limit, which the UI must state.
+4. **PCM transfer:** apps ↔ WaveRT cyclic buffers (Windows audio engine). Driver timers advance positions and copy render → ring → capture.
+5. **User/kernel communication:** none needed for audio (WASAPI). A pool-management interface (enable or rename slots) would be a small IOCTL set if added later.
+6. **Naming and identity:** device description "dB-Deck Virtual Cable 1" (INF). Windows forms endpoint names from form factor + description. Endpoint IDs are stable for the root-enumerated device instance.
+7. **Safe removal:** `devcon remove` (or Device Manager) tears down the subdevices. Apps receive `AUDCLNT_E_DEVICE_INVALIDATED`, which the engine already handles (bus → disconnected, retry).
+8. **Signing and distribution:** development needs test signing in a VM. Distribution needs an EV certificate and attestation signing (Partner Center) or HLK. A test-signed package is not suitable for end users.
+9. **Installation and uninstallation:** a separate, optional, elevated component (`pnputil /add-driver … /install` + devcon-style root device creation). The main app's uninstaller must warn when the cable is in use. Steps are in `driver/windows/README.md`.
+10. **Failure recovery:** if no capture stream runs, render data is discarded. Capture underruns produce silence. Latency is bounded to 200 ms (oldest data dropped). Engine crashes don't affect the driver.
 
-## 3. Dynamic endpoints
-Truly arbitrary live creation is possible in principle by registering additional subdevices at runtime. However, the audio endpoint builder caches endpoints, and churn there is fragile. **Decision (provisional):** use a fixed maximum pool (for example 16 pairs) as the safe alternative, documented as a driver-side limit rather than a product limit. If that ships, it must be stated clearly in the UI.
+## Scaling (next)
+- Pool of N cable pairs: duplicate the minipair tables per slot (macro-generated), give each slot its own ring, and enable slots through a registry value under the device's software key. The UI's "Create virtual device" then enables a slot and restarts the device.
+- Per-slot friendly names via INF strings (static) or `KSPROPERTY_PIN_NAME`.
+- Optional 32-bit float formats (the ring would need float↔int conversion without FPU use, or `KeSaveExtendedProcessorState`).
 
-## 4. PCM transport
-- WaveRT position is reported from a high-resolution timer (as SysVAD does). The driver's DPC copies between the WaveRT buffer and a lock-free ring.
-- Shared memory: the engine maps a section created by the driver (MDL locked into a user-mode mapping via an IOCTL), so samples move without a per-buffer IOCTL. Clocking: the driver's timer is a separate clock domain, so the engine bridges it with the existing `AdaptiveStream`. No new resampling code is needed.
-
-## 5. User/kernel communication
-A device interface (custom GUID) exposed by the driver, opened by the engine with `CreateFile`. IOCTLs: `QUERY_VERSION`, `ENABLE_ENDPOINT(slot, name, format)`, `DISABLE_ENDPOINT(slot)`, `MAP_RING(slot, direction)`, `UNMAP_RING`. All inputs are validated in the driver, and only the engine's session or user may open the interface (security descriptor in the INF).
-
-## 6. Naming and identity
-Friendly names are set through the endpoint property store (`PKEY_Device_FriendlyName`) when a slot is enabled. The slot index is stable, so the endpoint ID is stable across reboots, and profiles store the endpoint ID like any other device.
-
-## 7. Safe removal
-Disable the slot: stop the engine streams, unmap the ring, `PcUnregisterSubdevice`. Apps holding streams get `AUDCLNT_E_DEVICE_INVALIDATED`, which they must handle anyway.
-
-## 8. Signing and distribution
-- Development: test signing in an **isolated test VM** only. Enabling test signing on the primary workstation requires explicit user approval and is not planned.
-- Distribution: an EV code-signing certificate, then HLK testing or attestation signing through the Microsoft Partner Center. A test-signed package is **not** suitable for end users.
-
-## 9. Installation and uninstallation
-A separate, optional installer component (the base app does not require it): `pnputil /add-driver dbdeck.inf /install` (elevated), and an uninstall path that disables all slots, then `pnputil /delete-driver`. The main uninstaller must warn when virtual endpoints are in use.
-
-## 10. Failure recovery
-- If the engine disconnects, the driver keeps the endpoints and plays silence (render data is discarded, capture is zero-filled). Apps never see errors from an engine crash.
-- The driver never blocks in the audio path, and every IOCTL buffer is length-checked.
-- The engine re-maps rings on reconnect.
-
-## Staged plan
-1. Install the WDK and build stock SysVAD in a test VM.
-2. **Prove playback**: one render endpoint, with PCM delivered into the engine (`dbdeck-wintests` gains a tone-through-virtual-endpoint test).
-3. **Prove recording**: one capture endpoint receives an engine bus.
-4. Slot pool, naming and IOCTL management, plus UI (Virtual Devices page).
-5. Signing pipeline and separate installer.
-
-## Interim: third-party virtual cables
-The Virtual Devices page detects likely virtual endpoints (VB-Audio, Voicemeeter, etc.) and offers "Capture as input" (loopback of the cable's playback side) and "New bus to it". This gives the same App → dB-Deck → Main and Mic+Game → Stream bus → OBS topologies today, with real PCM.
+## Safety rules (unchanged)
+Never enable test signing, disable Secure Boot, change boot configuration, install the driver, or reboot on the development workstation without explicit user approval. Prefer a disposable VM.

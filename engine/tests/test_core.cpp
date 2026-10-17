@@ -346,6 +346,21 @@ TEST("routing: loopback of an output routed back to it is a feedback loop") {
     CHECK(!validateRouting(p).has_value());
 }
 
+TEST("routing: recording side of a virtual cable routed into its playback side is feedback") {
+    ProfileConfig p = profileWithBuses(1);
+    p.findBus("bus0")->deviceId = "{cable-in}";  // bus plays into the cable
+    ChannelConfig c = makeChannel(ChannelType::HardwareInput, "Cable out", p);
+    c.deviceId = "{cable-out}";
+    c.sends[0].busId = "bus0";
+    p.channels.push_back(c);
+    CHECK(!validateRouting(p).has_value());  // unknown pairing: allowed
+    CablePairs pairs{{"{cable-out}", "{cable-in}"}};
+    auto issue = validateRouting(p, pairs);
+    CHECK(issue && issue->code == "feedback");
+    p.channels[0].sends[0].busId = "main";  // Main plays elsewhere: fine
+    CHECK(!validateRouting(p, pairs).has_value());
+}
+
 // --- Protocol ----------------------------------------------------------------------
 
 TEST("protocol: parses valid requests and rejects malformed ones") {

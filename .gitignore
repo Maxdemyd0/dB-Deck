@@ -13,3 +13,9 @@ apps/desktop/src-tauri/gen/
 .vscode/
 *.user
 *.log
+
+# Driver build output
+driver/windows/dbdeck-vad/**/x64/
+driver/windows/dbdeck-vad/x64/
+*.VC.db
+*.aps

@@ -12,8 +12,10 @@
 | 8 | Feedback guard rejects loopback of a device routed (directly or via bus chains) back to the same device; bus cycles are rejected | Safety: no feedback loops. |
 | 9 | No implicit fallback to the Windows default. Only user-listed fallbacks | Requirement: never play on unauthorized hardware. |
 | 10 | Windows master volume via `IAudioEndpointVolume` with a private event-context GUID; no commands in response to notifications | Bidirectional sync without echo loops. |
-| 11 | No virtual driver code shipped | WDK unavailable and no safe test VM. A fake device is forbidden. Third-party cables are supported instead (see DRIVER_PLAN). |
+| 11 | Virtual driver = loopback cable derived from SimpleAudioSample; engine uses its endpoints through WASAPI | No custom kernel↔user transport (smaller attack surface). Reuses verified engine paths. One shared clock inside the cable means no drift. See DRIVER_PLAN. |
 | 12 | Static CRT for the engine; nlohmann/json pinned by SHA-256 via FetchContent; minimal in-house test harness | Reproducible build, no VC++ redistributable, minimal dependencies. |
 | 13 | Per-user NSIS installer (no admin); hooks stop the engine before install/uninstall; user settings are kept | Normal runtime needs no elevation. Uninstall doesn't leave a running engine behind. |
 | 14 | Fader taper for managed audio = position² | Simple, monotonic, about −12 dB at mid travel. Shown in dB in the UI. |
 | 15 | Groups are gain/mute stages applied to member channels (not separate PCM buses) | Mathematically equal to a post-fader submix without group effects. Honest in session-only mode, where they scale session volumes. |
+| 16 | Driver directory is MS-PL; the rest of dB-Deck stays MIT | SimpleAudioSample is MS-PL. Derived source must stay under MS-PL. |
+| 17 | Cable-pair feedback protection only for adapters named as cables (and dB-Deck's driver) with exactly one playback and one recording endpoint | Avoids false rejections for processing devices (Voicemeeter, NVIDIA Broadcast, Voicemod) that are not loopbacks. |

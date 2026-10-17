@@ -29,6 +29,11 @@ std::map<uint32_t, uint32_t> parentPids() {
     return m;
 }
 
+// Endpoints created by dB-Deck's own driver (driver/windows/dbdeck-vad).
+bool isDbDeckDriverDevice(const DeviceInfo& d) {
+    return d.adapterName.rfind("dB-Deck Virtual Cable", 0) == 0;
+}
+
 json deviceJson(const DeviceInfo& d) {
     return {{"id", d.id},
             {"name", d.name},
@@ -38,6 +43,7 @@ json deviceJson(const DeviceInfo& d) {
             {"isDefault", d.isDefault},
             {"isDefaultComms", d.isDefaultComms},
             {"likelyVirtual", d.likelyVirtual},
+            {"dbdeckDriver", isDbDeckDriverDevice(d)},
             {"format", d.formatKnown ? d.mixFormat.describe() : ""}};
 }
 
@@ -623,7 +629,7 @@ json EngineService::mutate(bool undoable, bool structural, const std::function<j
     ProfileConfig& live = profile();
     ProfileConfig copy = live;
     json result = fn(copy);
-    if (auto issue = validateRouting(copy)) throw ProtocolError("rejected", issue->message);
+    if (auto issue = validateRouting(copy, cablePairs())) throw ProtocolError("rejected", issue->message);
     if (undoable) {
         undo_.push_back(toJson(live));
         if (undo_.size() > kMaxUndo) undo_.pop_front();
@@ -845,19 +851,49 @@ json EngineService::windowsVolumeJson() const {
     return {{"default", volumeStateJson(defaultVolume_->state())}, {"main", volumeStateJson(mainVolume_->state())}};
 }
 
+CablePairs EngineService::cablePairs() const {
+    // A loopback cable is an adapter named as a cable (dB-Deck's driver,
+    // "VB-Audio Virtual Cable", "Virtual Audio Cable", ...) exposing exactly
+    // one playback and one recording endpoint. Other virtual devices
+    // (Voicemeeter, NVIDIA Broadcast, Voicemod) process audio rather than
+    // echo it, so they are not paired.
+    std::map<std::string, std::pair<std::vector<const DeviceInfo*>, std::vector<const DeviceInfo*>>> byAdapter;
+    for (auto& d : deviceList_) {
+        if (!isDbDeckDriverDevice(d) && toLowerAscii(d.adapterName).find("cable") == std::string::npos) continue;
+        if (d.adapterName.empty()) continue;
+        auto& slot = byAdapter[d.adapterName];
+        (d.render ? slot.first : slot.second).push_back(&d);
+    }
+    CablePairs pairs;
+    for (auto& [adapter, rc] : byAdapter)
+        if (rc.first.size() == 1 && rc.second.size() == 1) pairs[rc.second[0]->id] = rc.first[0]->id;
+    return pairs;
+}
+
 json EngineService::driverStateJson() const {
-    return {{"installed", false},
-            {"status", "not-available"},
+    json own = json::array(), third = json::array();
+    for (auto& d : deviceList_) {
+        if (isDbDeckDriverDevice(d)) own.push_back(deviceJson(d));
+        else if (d.likelyVirtual) third.push_back(deviceJson(d));
+    }
+    const bool installed = !own.empty();
+    return {{"installed", installed},
+            {"status", installed ? "installed" : "not-installed"},
             {"message",
-             "The dB-Deck virtual audio driver is not part of this build (the Windows Driver Kit is required and a "
-             "signed driver package is needed for normal installation). Existing virtual cables (for example "
-             "VB-Audio or Voicemeeter endpoints) can be used as inputs and bus outputs instead."},
-            {"thirdPartyVirtualEndpoints", [&] {
+             installed
+                 ? "dB-Deck Virtual Cable is installed. Audio played into \"dB-Deck Virtual Input\" comes out of "
+                   "\"dB-Deck Virtual Output\"."
+                 : "The dB-Deck virtual audio driver is not installed. It is built from driver/windows/dbdeck-vad "
+                   "but is currently only test-signed, so it can only be installed on a test machine with test "
+                   "signing enabled (see docs/DRIVER_PLAN.md). Existing virtual cables (for example VB-Audio or "
+                   "Voicemeeter endpoints) can be used as inputs and bus outputs instead."},
+            {"endpoints", own},
+            {"cablePairs", [&] {
                  json a = json::array();
-                 for (auto& d : deviceList_)
-                     if (d.likelyVirtual) a.push_back(deviceJson(d));
+                 for (auto& [cap, ren] : cablePairs()) a.push_back({{"recording", cap}, {"playback", ren}});
                  return a;
-             }()}};
+             }()},
+            {"thirdPartyVirtualEndpoints", third}};
 }
 
 json EngineService::diagnosticsJson() {
@@ -1392,7 +1428,7 @@ void EngineService::registerCommands() {
         const std::string id = argString(a, "id");
         ProfileConfig* p = config_.findProfile(id);
         requireFound(p, "profile");
-        if (auto issue = validateRouting(*p)) throw ProtocolError("rejected", "profile has invalid routing: " + issue->message);
+        if (auto issue = validateRouting(*p, cablePairs())) throw ProtocolError("rejected", "profile has invalid routing: " + issue->message);
         config_.activeProfileId = id;
         undo_.clear();
         markDirty();

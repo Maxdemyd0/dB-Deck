@@ -1,4 +1,5 @@
 #pragma once
+#include <map>
 #include <optional>
 #include <string>
 #include <vector>
@@ -23,9 +24,14 @@ BusOrder orderBuses(const ProfileConfig& profile);
 // Buses reachable from `busIds` through enabled bus-to-bus sends (inclusive).
 std::vector<std::string> reachableBuses(const ProfileConfig& profile, const std::vector<std::string>& busIds);
 
+// Recording endpoint ID -> the playback endpoint it echoes (virtual cables:
+// whatever plays into the playback side comes out of the recording side).
+using CablePairs = std::map<std::string, std::string>;
+
 // Rejects configurations that would create a routing cycle, or a feedback
-// loop where a loopback capture of a playback endpoint is routed back into a
-// bus that plays on that same endpoint.
-std::optional<RoutingIssue> validateRouting(const ProfileConfig& profile);
+// loop: an input that hears a playback endpoint (loopback of that endpoint,
+// or the recording side of a virtual cable paired with it) routed back into
+// a bus that plays on that same endpoint.
+std::optional<RoutingIssue> validateRouting(const ProfileConfig& profile, const CablePairs& pairs = {});
 
 }  // namespace dbdeck

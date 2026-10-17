@@ -6,11 +6,11 @@
 | 1. Genuine Windows mixer (sessions, Available Apps, persistent channels, volume and mute, device selection, tray, persistence) | **Done, verified on real sessions.** |
 | + Windows master volume sync (added requirement) | **Done, verified** (dB-Deck⇄Windows, volume keys, mute, loop-free). Dragging the Quick Settings slider itself is not automated; see TESTING. |
 | 2. Real managed audio graph (capture, playback, multiple channels and buses, routing, meters, gain, validation) | **Done.** Two-source mixing and bus independence verified with real PCM in tests. Render and capture verified through real Windows endpoints. |
-| 3. Virtual audio infrastructure (driver) | **Not started in code. Blocked:** no WDK, no isolated test VM, no signing. Plan: DRIVER_PLAN.md. Interim: third-party virtual cables are supported. |
+| 3. Virtual audio infrastructure (driver) | **Driver written and builds** (loopback cable derived from SimpleAudioSample; test-signed; InfVerif valid). Engine detects it, lists its endpoints and protects against cable feedback. **Not installed or runtime-tested. Blocked on:** a test-signing VM (installing on the dev PC needs test signing + reboot and explicit approval). Production needs an EV certificate + attestation. The Milestone 3 acceptance test (an app plays into the virtual endpoint and dB-Deck delivers it elsewhere) is not yet run. |
 | 4. Polished app (profiles, scenes, effects, groups, routing UI, hotkeys, diagnostics, installer, docs) | **Mostly done.** The installer is built but not install-tested on a clean machine. |
 
 ## Is dB-Deck a Voicemeeter replacement yet?
-**No.** It replaces the Volume Mixer use case and offers real managed routing for microphones, loopback-captured devices and captured apps. It cannot yet create its own virtual devices, which is Voicemeeter's defining feature. Until the driver exists, routing an arbitrary app independently requires a third-party virtual cable.
+**No.** It replaces the Volume Mixer use case and offers real managed routing for microphones, loopback-captured devices and captured apps. Its own virtual cable is built but not yet proven on a running system, and it offers one cable, not on-demand devices. Until it is installed and tested, routing an arbitrary app independently requires a third-party virtual cable.
 
 ## Build and run
 See README. `scripts\build-release.cmd` produces the installer. In dev, `npx tauri dev` uses `build/engine-Release/dbdeck-engine.exe`.
@@ -24,13 +24,13 @@ Engine CLI for debugging: `python scripts/engine-cli.py getState`, or `--events 
 - **Full state push per command:** fine for typical sizes. A large profile with a fast fader drag sends about 20 state messages/s, and a delta protocol would scale better.
 - **Engine respawn:** if the user ends the engine while the UI runs, the UI restarts it. That is intended crash recovery. Tray "Exit" stops both.
 - **App matching:** by executable name (plus optional path filter). Two different apps with the same exe name share a channel unless a path filter is set.
-- **Third-party cable pairing** (cable playback side ↔ recording side) is not detected, so feedback through an external cable (bus → cable in, cable out → input → same bus) is not prevented. Only same-device loopback loops are blocked.
+- **Cable feedback protection** pairs playback/recording sides only for dB-Deck's driver and adapters named as cables with exactly one endpoint each way. A loopback device named differently (or a multi-cable adapter) is not paired, so a loop through it is not prevented.
 - `tauri.conf.json` warns that `STATIC_VCRUNTIME` is deprecated. This is cosmetic.
 
 ## Next engineering steps
 1. Manually verify Quick Settings ⇄ dB-Deck, device unplug/replug, sleep/resume, and app capture with Discord/a game. Add results to TESTING.md.
 2. Install-test the NSIS installer on a clean VM (Start with Windows, uninstall stops the engine and removes the Run key).
-3. Driver stage 1 in a VM (DRIVER_PLAN steps 1–2).
+3. Install the driver in a test-signing VM and run the test plan in driver/windows/README.md (proves Milestone 3). Then build the cable pool (DRIVER_PLAN "Scaling").
 4. Delta state events; polyphase resampler; limiter lookahead (optional, adds latency).
 5. Latency measurement for mic → Main in `low` mode; publish figures.
-6. Detect virtual-cable pairs (shared container ID or name heuristics) to extend feedback protection.
+6. Pair multi-cable adapters (e.g. VB-Audio Hi-Fi / A+B cables) by endpoint name to extend feedback protection.

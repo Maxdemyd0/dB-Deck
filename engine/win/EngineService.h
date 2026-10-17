@@ -30,6 +30,7 @@
 #include "config/ConfigStore.h"
 #include "graph/GraphCompiler.h"
 #include "graph/Mixer.h"
+#include "graph/Validation.h"
 #include "protocol/Protocol.h"
 
 namespace dbdeck::win {
@@ -97,6 +98,7 @@ private:
     json windowsVolumeJson() const;
     json diagnosticsJson();
     json driverStateJson() const;
+    CablePairs cablePairs() const;
 
     EngineOptions opts_;
     ConfigStore store_;

@@ -67,7 +67,7 @@ static std::string busName(const ProfileConfig& p, const std::string& id) {
     return b ? b->name : id;
 }
 
-std::optional<RoutingIssue> validateRouting(const ProfileConfig& profile) {
+std::optional<RoutingIssue> validateRouting(const ProfileConfig& profile, const CablePairs& pairs) {
     BusOrder order = orderBuses(profile);
     if (!order.cycle.empty()) {
         std::string path;
@@ -79,18 +79,24 @@ std::optional<RoutingIssue> validateRouting(const ProfileConfig& profile) {
     }
 
     for (auto& c : profile.channels) {
-        if (c.type != ChannelType::EndpointLoopback || c.deviceId.empty()) continue;
+        if (c.deviceId.empty()) continue;
+        // The playback endpoint this input hears, if any.
+        std::string heard;
+        if (c.type == ChannelType::EndpointLoopback) heard = c.deviceId;
+        else if (c.type == ChannelType::HardwareInput)
+            if (auto it = pairs.find(c.deviceId); it != pairs.end()) heard = it->second;
+        if (heard.empty()) continue;
         std::vector<std::string> direct;
         for (auto& s : c.sends)
             if (s.enabled) direct.push_back(s.busId);
         for (auto& id : reachableBuses(profile, direct)) {
             const BusConfig* b = profile.findBus(id);
             if (!b) continue;
-            const bool hits = b->deviceId == c.deviceId ||
-                              std::find(b->fallbackDeviceIds.begin(), b->fallbackDeviceIds.end(), c.deviceId) !=
+            const bool hits = b->deviceId == heard ||
+                              std::find(b->fallbackDeviceIds.begin(), b->fallbackDeviceIds.end(), heard) !=
                                   b->fallbackDeviceIds.end();
             if (hits)
-                return RoutingIssue{"feedback", "Feedback loop: '" + c.name + "' captures the device that bus '" +
+                return RoutingIssue{"feedback", "Feedback loop: '" + c.name + "' hears the device that bus '" +
                                                     b->name + "' plays to"};
         }
     }

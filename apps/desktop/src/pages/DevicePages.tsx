@@ -175,49 +175,64 @@ export function OutputsPage({ state }: { state: EngineState }) {
   );
 }
 
+function VirtualEndpointRow({ d, used }: { d: Device; used: Set<string> }) {
+  return (
+    <div className="list-row">
+      <Icon name={d.flow === "render" ? "output" : "mic"} />
+      <span className="grow ellipsis" title={d.name}>{d.name}</span>
+      <span className="badge">{d.flow === "render" ? "playback" : "recording"}</span>
+      {d.state !== "active" && <span className="badge warn">{d.state}</span>}
+      {d.flow === "render" ? (
+        <>
+          <button className="btn small" disabled={used.has(d.id) || d.state !== "active"} title="Capture what apps play into this device" onClick={() => request("createChannel", { type: "endpointLoopback", deviceId: d.id }).catch(() => {})}>Capture as input</button>
+          <button className="btn small" disabled={d.state !== "active"} title="Send a dB-Deck bus into this device" onClick={() => request("createBus", { name: d.name.split(" (")[0], deviceId: d.id }).catch(() => {})}>New bus to it</button>
+        </>
+      ) : (
+        <button className="btn small" disabled={used.has(d.id) || d.state !== "active"} onClick={() => request("createChannel", { type: "hardwareInput", deviceId: d.id }).catch(() => {})}>Add as input</button>
+      )}
+    </div>
+  );
+}
+
 export function VirtualDevicesPage({ state }: { state: EngineState }) {
-  const v = state.driver.thirdPartyVirtualEndpoints;
+  const drv = state.driver;
   const used = new Set(state.profile.channels.map((c) => c.deviceId));
+  const nameOf = (id: string) => state.devices.find((d) => d.id === id)?.name ?? id;
   return (
     <div className="page">
       <h1 className="page-title">Virtual Devices</h1>
       <p className="page-sub">Virtual devices let other apps send audio into dB-Deck, or record a dB-Deck bus (for example in OBS or Discord).</p>
-      <div className="notice warn">
-        <Icon name="warn" />
-        <div>
-          <strong>dB-Deck's own virtual audio driver is not installed.</strong> {state.driver.message} On-demand creation of dB-Deck endpoints will become available here once
-          a signed driver package exists — see docs/DRIVER_PLAN.md.
+
+      {drv.installed ? (
+        <div className="card">
+          <h3><Icon name="virtual" size={14} /> dB-Deck Virtual Cable <span className="badge ok">installed</span></h3>
+          <p className="muted small" style={{ marginTop: 0 }}>{drv.message}</p>
+          <div className="list">{drv.endpoints.map((d) => <VirtualEndpointRow key={d.id} d={d} used={used} />)}</div>
         </div>
-      </div>
+      ) : (
+        <div className="notice warn">
+          <Icon name="warn" />
+          <div><strong>dB-Deck's virtual cable driver is not installed.</strong> {drv.message}</div>
+        </div>
+      )}
 
       <div className="card" style={{ marginTop: 12 }}>
-        <h3>Use an existing virtual cable</h3>
+        <h3>How to route with a virtual cable</h3>
         <ol className="muted" style={{ margin: "0 0 4px", paddingLeft: 18, lineHeight: 1.7 }}>
-          <li><strong>App → dB-Deck:</strong> in Windows Settings › Sound › Volume mixer, set the app's output to a virtual cable's playback side. Then add a channel here that captures that playback side.</li>
-          <li><strong>dB-Deck → app:</strong> create a bus, set its output to a virtual cable's playback side, and select the cable's recording side in OBS or Discord.</li>
+          <li><strong>App → dB-Deck:</strong> in Windows Settings › Sound › Volume mixer, set the app's output to the cable's playback side. Then use <em>Capture as input</em> on that playback side.</li>
+          <li><strong>dB-Deck → app:</strong> use <em>New bus to it</em> on the cable's playback side, and pick the cable's recording side in OBS or Discord.</li>
         </ol>
+        {drv.cablePairs.length > 0 && (
+          <p className="faint small" style={{ marginBottom: 0 }}>
+            Recognised cable pairs (used for feedback protection): {drv.cablePairs.map((p) => `${nameOf(p.playback)} → ${nameOf(p.recording)}`).join("; ")}
+          </p>
+        )}
       </div>
 
       <div className="card">
-        <h3>Detected virtual endpoints ({v.length})</h3>
-        {v.length === 0 && <span className="faint">No virtual audio devices were detected.</span>}
-        <div className="list">
-          {v.map((d) => (
-            <div className="list-row" key={d.id}>
-              <Icon name={d.flow === "render" ? "output" : "mic"} />
-              <span className="grow ellipsis" title={d.name}>{d.name}</span>
-              <span className="badge">{d.flow === "render" ? "playback" : "recording"}</span>
-              {d.flow === "render" ? (
-                <>
-                  <button className="btn small" disabled={used.has(d.id)} onClick={() => request("createChannel", { type: "endpointLoopback", deviceId: d.id }).catch(() => {})}>Capture as input</button>
-                  <button className="btn small" onClick={() => request("createBus", { name: d.name.split(" (")[0], deviceId: d.id }).catch(() => {})}>New bus to it</button>
-                </>
-              ) : (
-                <button className="btn small" disabled={used.has(d.id)} onClick={() => request("createChannel", { type: "hardwareInput", deviceId: d.id }).catch(() => {})}>Add as input</button>
-              )}
-            </div>
-          ))}
-        </div>
+        <h3>Other virtual endpoints ({drv.thirdPartyVirtualEndpoints.length})</h3>
+        {drv.thirdPartyVirtualEndpoints.length === 0 && <span className="faint">No other virtual audio devices were detected.</span>}
+        <div className="list">{drv.thirdPartyVirtualEndpoints.map((d) => <VirtualEndpointRow key={d.id} d={d} used={used} />)}</div>
       </div>
     </div>
   );
