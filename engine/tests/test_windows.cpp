@@ -323,7 +323,7 @@ TEST("win: hardware/loopback capture delivers real PCM into the engine") {
     ProfileConfig p = makeDefaultProfile("t");
     p.mainBus()->deviceId = dev->id;
     p.channels.push_back(makeChannel(ChannelType::TestTone, "tone", p));
-    auto tone = std::make_shared<ToneGenerator>(48000, 750, 0.1f);
+    auto tone = std::make_shared<ToneGenerator>(48000.0, 750.0f, 0.1f);
     auto rs = RenderStream::open(env.dm, dev->id, buf, err);
     CHECK(rs != nullptr);
     CompileContext ctx;
@@ -556,4 +556,55 @@ TEST("win: IPC requires hello, rejects malformed input, serves state") {
     readReply(11);
     engine.join();
     CHECK(std::filesystem::exists(dir / "config.json"));
+}
+
+TEST("win: dB-Deck virtual cable carries real PCM from Virtual Input to Virtual Output (driver)") {
+    Env env;
+    const DeviceInfo* in = nullptr;
+    const DeviceInfo* out = nullptr;
+    for (auto& d : env.devices) {
+        if (d.state != "active" || d.adapterName.rfind("dB-Deck Virtual Cable", 0) != 0) continue;
+        (d.render ? in : out) = &d;
+    }
+    if (!in || !out) {
+        std::cout << "       SKIPPED: dB-Deck virtual cable driver not installed\n";
+        return;
+    }
+    std::cout << "       playback: " << in->name << " | recording: " << out->name << "\n";
+    // Engine renders a 1 kHz tone into Virtual Input; the engine's own capture
+    // of Virtual Output must receive it.
+    BufferSettings buf;
+    std::string err;
+    auto cap = CaptureStream::openDevice(env.dm, out->id, false, buf, err);
+    CHECK(cap != nullptr);
+    Mixer mixer;
+    RuntimeRegistry reg;
+    ProfileConfig p = makeDefaultProfile("t");
+    p.mainBus()->deviceId = in->id;
+    p.channels.push_back(makeChannel(ChannelType::TestTone, "tone", p));
+    auto tone = std::make_shared<ToneGenerator>(48000.0, 1000.0f, 0.1f);
+    auto rs = RenderStream::open(env.dm, in->id, buf, err);
+    CHECK(rs != nullptr);
+    CompileContext ctx;
+    ctx.sourcesFor = [&](const ChannelConfig&) { return std::vector<std::shared_ptr<PullSource>>{tone}; };
+    ctx.outputFor = [&](const BusConfig& b) -> std::optional<OutputBinding> { return OutputBinding{b.deviceId, nullptr}; };
+    reg.applyParams(p);
+    mixer.publish(compileGraph(p, reg, ctx, mixer.nextEpoch()));
+    mixer.setClockRunning(true);
+    rs->startMaster(&mixer);
+    std::vector<float> got, block(480 * 2);
+    for (int i = 0; i < 200; ++i) {  // 2 s
+        std::this_thread::sleep_for(10ms);
+        cap->stream()->pull(block.data(), 480);
+        if (i > 80) got.insert(got.end(), block.begin(), block.end());
+    }
+    rs->stop();
+    mixer.setClockRunning(false);
+    cap->stop();
+    const double amp = testsig::toneAmplitude(got, 0, 48000, 1000);
+    const double freq = testsig::estimateFrequency(got, 0, 48000);
+    std::cout << "       through the cable: 1 kHz amplitude " << amp << " (sent 0.1), frequency " << freq
+              << " Hz, capture underruns " << cap->stream()->stats().underruns << "\n";
+    CHECK(amp > 0.08 && amp < 0.12);
+    CHECK_NEAR(freq, 1000, 10);
 }
