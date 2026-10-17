@@ -1,0 +1,68 @@
+import { useState } from "react";
+import { Icon } from "../components/Icon";
+import { Prompt } from "../components/Overlay";
+import { request } from "../engine/store";
+import type { EngineState } from "../engine/types";
+
+type PromptState = { title: string; initial: string; submit: string; run: (v: string) => void } | null;
+
+export function ProfilesPage({ state }: { state: EngineState }) {
+  const [prompt, setPrompt] = useState<PromptState>(null);
+  const active = state.activeProfileId;
+  const scenes = state.profile.scenes;
+  return (
+    <div className="page">
+      <h1 className="page-title">Profiles &amp; Scenes</h1>
+      <p className="page-sub">
+        A <strong>profile</strong> is a complete mixer setup — channels, groups, buses, routing, effects and outputs. A <strong>scene</strong> is a quick snapshot of levels, mutes and send
+        levels inside the current profile, and switches without restarting any device.
+      </p>
+      <div className="grid2">
+        <div className="card">
+          <div className="row" style={{ marginBottom: 6 }}>
+            <h3 className="grow" style={{ margin: 0 }}>Profiles</h3>
+            <button className="btn small" onClick={() => setPrompt({ title: "New profile", initial: "Streaming", submit: "Create", run: (name) => request("createProfile", { name }).catch(() => {}) })}>
+              <Icon name="plus" size={12} /> New
+            </button>
+            <button className="btn small" onClick={() => setPrompt({ title: "Duplicate current profile", initial: `${state.profile.name} copy`, submit: "Duplicate", run: (name) => request("createProfile", { name, copyCurrent: true }).catch(() => {}) })}>
+              Duplicate
+            </button>
+          </div>
+          <div className="list">
+            {state.profiles.map((p) => (
+              <div className="list-row" key={p.id}>
+                <span className={`dot ${p.id === active ? "ok" : ""}`} />
+                <span className="grow ellipsis">{p.name}</span>
+                {p.id === active ? <span className="badge accent">Active</span> : <button className="btn small primary" onClick={() => request("loadProfile", { id: p.id }).catch(() => {})}>Load</button>}
+                <button className="btn small ghost" onClick={() => setPrompt({ title: "Rename profile", initial: p.name, submit: "Rename", run: (name) => request("renameProfile", { id: p.id, name }).catch(() => {}) })}>Rename</button>
+                <button className="btn small ghost danger" disabled={p.id === active || state.profiles.length === 1} title={p.id === active ? "Load another profile first" : undefined} onClick={() => request("deleteProfile", { id: p.id }).catch(() => {})}>Delete</button>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="card">
+          <div className="row" style={{ marginBottom: 6 }}>
+            <h3 className="grow" style={{ margin: 0 }}>Scenes in “{state.profile.name}”</h3>
+            <button className="btn small" onClick={() => setPrompt({ title: "Save current levels as a scene", initial: "Late Night", submit: "Save", run: (name) => request("createScene", { name }).catch(() => {}) })}>
+              <Icon name="plus" size={12} /> Save current
+            </button>
+          </div>
+          {scenes.length === 0 && <span className="faint">No scenes yet. Set your levels, then save them as a scene.</span>}
+          <div className="list">
+            {scenes.map((s) => (
+              <div className="list-row" key={s.id}>
+                <Icon name="scene" />
+                <span className="grow ellipsis">{s.name}</span>
+                <button className="btn small primary" onClick={() => request("applyScene", { id: s.id }).catch(() => {})}>Apply</button>
+                <button className="btn small ghost" title="Replace this scene with the current levels" onClick={() => request("updateScene", { id: s.id, recapture: true }).catch(() => {})}>Update</button>
+                <button className="btn small ghost" onClick={() => setPrompt({ title: "Rename scene", initial: s.name, submit: "Rename", run: (name) => request("updateScene", { id: s.id, name }).catch(() => {}) })}>Rename</button>
+                <button className="btn small ghost danger" onClick={() => request("deleteScene", { id: s.id }).catch(() => {})}>Delete</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      {prompt && <Prompt title={prompt.title} label="Name" initial={prompt.initial} submitLabel={prompt.submit} onSubmit={prompt.run} onClose={() => setPrompt(null)} />}
+    </div>
+  );
+}

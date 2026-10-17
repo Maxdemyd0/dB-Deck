@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1f252c"/>
+      <stop offset="1" stop-color="#121519"/>
+    </linearGradient>
+    <linearGradient id="acc" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#14b8a6"/>
+      <stop offset="1" stop-color="#22d3ee"/>
+    </linearGradient>
+  </defs>
+  <rect x="16" y="16" width="480" height="480" rx="108" fill="url(#bg)"/>
+  <rect x="16" y="16" width="480" height="480" rx="108" fill="none" stroke="#2d363f" stroke-width="6"/>
+  <!-- three fader tracks with caps at different heights -->
+  <g stroke="#38424d" stroke-width="18" stroke-linecap="round">
+    <line x1="156" y1="120" x2="156" y2="392"/>
+    <line x1="256" y1="120" x2="256" y2="392"/>
+    <line x1="356" y1="120" x2="356" y2="392"/>
+  </g>
+  <g stroke="url(#acc)" stroke-width="18" stroke-linecap="round">
+    <line x1="156" y1="250" x2="156" y2="392"/>
+    <line x1="256" y1="170" x2="256" y2="392"/>
+    <line x1="356" y1="300" x2="356" y2="392"/>
+  </g>
+  <g fill="#e6f7fa">
+    <rect x="116" y="226" width="80" height="48" rx="14"/>
+    <rect x="216" y="146" width="80" height="48" rx="14"/>
+    <rect x="316" y="276" width="80" height="48" rx="14"/>
+  </g>
+</svg>

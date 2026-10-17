@@ -1,0 +1,65 @@
+/* dB-Deck design tokens. Dark-first; light theme via [data-theme="light"]. */
+:root {
+  --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Cascadia Mono", Consolas, monospace;
+
+  --bg: #0f1114;
+  --surface-1: #161a1e;
+  --surface-2: #1c2126;
+  --surface-3: #232930;
+  --surface-4: #2b323a;
+  --border: #2a3138;
+  --border-strong: #38414b;
+  --text: #e7ecf0;
+  --text-2: #a9b3bd;
+  --text-3: #6f7a85;
+
+  --accent: #22c7d6;
+  --accent-strong: #14b8a6;
+  --accent-soft: rgba(34, 199, 214, 0.14);
+  --accent-text: #061317;
+
+  --ok: #34d399;
+  --warn: #fbbf24;
+  --danger: #f87171;
+  --danger-soft: rgba(248, 113, 113, 0.14);
+  --warn-soft: rgba(251, 191, 36, 0.14);
+  --mute: #f97362;
+
+  --meter-low: #2dd4bf;
+  --meter-mid: #facc15;
+  --meter-high: #f87171;
+  --meter-bg: #0b0d10;
+
+  --radius-s: 6px;
+  --radius-m: 10px;
+  --radius-l: 14px;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 8px 28px rgba(0, 0, 0, 0.45);
+
+  --strip-w: 112px;
+  --strip-w-mixer: 132px;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --bg: #eef1f4;
+  --surface-1: #f7f9fa;
+  --surface-2: #ffffff;
+  --surface-3: #f0f3f5;
+  --surface-4: #e3e8ec;
+  --border: #d9dfe4;
+  --border-strong: #c3cbd2;
+  --text: #15191d;
+  --text-2: #4a5560;
+  --text-3: #7d8893;
+  --accent: #0e9fae;
+  --accent-strong: #0d9488;
+  --accent-soft: rgba(14, 159, 174, 0.12);
+  --accent-text: #ffffff;
+  --meter-bg: #dfe5ea;
+  --shadow-2: 0 8px 28px rgba(20, 30, 40, 0.16);
+  color-scheme: light;
+}
