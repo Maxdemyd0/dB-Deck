@@ -1,0 +1,15 @@
+# Build outputs
+build/
+out/
+target/
+dist/
+node_modules/
+apps/desktop/src-tauri/binaries/
+apps/desktop/src-tauri/gen/
+*.obj
+*.pdb
+*.ilk
+.vs/
+.vscode/
+*.user
+*.log
