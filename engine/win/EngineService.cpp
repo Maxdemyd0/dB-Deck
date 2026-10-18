@@ -608,7 +608,7 @@ void EngineService::applySessionVolumes() {
     ProfileConfig& p = profile();
     for (auto& c : p.channels) {
         if (c.type != ChannelType::App) continue;
-        float vol = c.volume;
+        float vol = std::min(c.volume, 1.0f);  // Windows session volume range
         bool mute = c.mute;
         if (const GroupConfig* g = p.findGroup(c.groupId)) {
             vol *= g->volume;
@@ -1137,7 +1137,10 @@ void EngineService::registerCommands() {
                 if (v->empty()) throw ProtocolError("bad_args", "name cannot be empty");
                 c->name = *v;
             }
-            if (auto v = optFloat(a, "volume", 0, 1)) c->volume = *v;
+            if (auto v = optFloat(a, "volume", 0, kFaderMax)) {
+                // Windows session volume cannot exceed 100%; boost needs managed audio.
+                c->volume = (c->type == ChannelType::App && !c->appCapture) ? std::min(*v, 1.0f) : *v;
+            }
             if (auto v = optBool(a, "mute")) c->mute = *v;
             if (auto v = optFloat(a, "gainDb", -60, 24)) c->gainDb = *v;
             if (auto v = optFloat(a, "balance", -1, 1)) c->balance = *v;
@@ -1268,7 +1271,7 @@ void EngineService::registerCommands() {
             BusConfig* b = p.findBus(id);
             requireFound(b, "bus");
             if (auto v = optString(a, "name")) b->name = *v;
-            if (auto v = optFloat(a, "volume", 0, 1)) b->volume = *v;
+            if (auto v = optFloat(a, "volume", 0, kFaderMax)) b->volume = *v;
             if (auto v = optBool(a, "mute")) b->mute = *v;
             if (auto v = optString(a, "deviceId")) {
                 if (!v->empty()) {

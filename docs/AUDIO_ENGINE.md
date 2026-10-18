@@ -24,7 +24,7 @@ Audio threads register with MMCSS ("Pro Audio") and set FTZ/DAZ. Device invalida
 Render path, engine to the Windows endpoint mix (measured with QPC-timestamped loopback, `normal` mode, "Dummy Output (Voicemod)" device): **22.8–23.7 ms** across runs (negotiated device buffer 22 ms). Input-to-output latency adds the capture buffer and the input ring target, and is reported live as an estimate on the Diagnostics page. The ≤20 ms goal is plausible in `low` mode on 48 kHz devices, but that end-to-end figure has **not** been measured yet.
 
 ## Gain and smoothing
-- Managed faders: gain = position² (0.5 ≈ −12 dB), plus trim in dB. App (session) faders pass the raw scalar to Windows, like the Volume Mixer.
+- Managed faders: 0–1 uses gain = position² (0.5 ≈ −12 dB); 1–1.5 boosts linearly in dB up to **+20 dB** (0 dB at two thirds of the travel). Plus a per-channel trim (−60…+24 dB). Boosted signals can clip at the output clamp; add a Limiter on the bus to avoid that. App (session) faders pass the raw scalar to Windows, like the Volume Mixer.
 - All gains use one-pole per-sample smoothing (~5 ms). Effect bypass crossfades over ~4 ms. Outputs fade in over ~15 ms on (re)connect.
 - Outputs are clamped to ±1.0. Bus meters count clipped blocks (shown as clip indicators).
 

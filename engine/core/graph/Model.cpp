@@ -1,5 +1,7 @@
 #include "graph/Model.h"
 
+#include "audio/Gain.h"
+
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -331,7 +333,7 @@ ChannelConfig channelFromJson(const json& j, const std::string& path) {
     c.deviceId = getString(j, "deviceId", path, "");
     c.deviceName = getString(j, "deviceName", path, "");
     c.toneHz = getFloat(j, "toneHz", path, 440.0f, 20.0f, 20000.0f);
-    c.volume = getFloat(j, "volume", path, 1.0f, 0.0f, 1.0f);
+    c.volume = getFloat(j, "volume", path, 1.0f, 0.0f, kFaderMax);
     c.gainDb = getFloat(j, "gainDb", path, 0.0f, -60.0f, 24.0f);
     c.balance = getFloat(j, "balance", path, 0.0f, -1.0f, 1.0f);
     c.mute = getBool(j, "mute", path, false);
@@ -351,7 +353,7 @@ static SceneConfig sceneFromJson(const json& j, const std::string& path) {
         for (auto& [id, v] : it->items()) {
             const std::string p = path + "/channels/" + id;
             SceneChannelState st;
-            st.volume = getFloat(v, "volume", p, 1.0f, 0.0f, 1.0f);
+            st.volume = getFloat(v, "volume", p, 1.0f, 0.0f, kFaderMax);
             st.mute = getBool(v, "mute", p, false);
             if (auto g = v.find("sendGains"); g != v.end() && g->is_object())
                 for (auto& [b, gv] : g->items())
@@ -366,7 +368,7 @@ static SceneConfig sceneFromJson(const json& j, const std::string& path) {
         if (auto it = j.find(key); it != j.end() && it->is_object())
             for (auto& [id, v] : it->items()) {
                 const std::string p = path + "/" + key + "/" + id;
-                out[id] = {getFloat(v, "volume", p, 1.0f, 0.0f, 1.0f), getBool(v, "mute", p, false)};
+                out[id] = {getFloat(v, "volume", p, 1.0f, 0.0f, kFaderMax), getBool(v, "mute", p, false)};
             }
     };
     readPairs("groups", s.groups);
@@ -401,7 +403,7 @@ ProfileConfig profileFromJson(const json& j, const std::string& path) {
             bc.id = getString(b, "id", bp, "", true);
             bc.name = getString(b, "name", bp, "Bus");
             bc.isMain = getBool(b, "isMain", bp, false);
-            bc.volume = getFloat(b, "volume", bp, 1.0f, 0.0f, 1.0f);
+            bc.volume = getFloat(b, "volume", bp, 1.0f, 0.0f, kFaderMax);
             bc.mute = getBool(b, "mute", bp, false);
             bc.deviceId = getString(b, "deviceId", bp, "");
             bc.deviceName = getString(b, "deviceName", bp, "");

@@ -83,7 +83,7 @@ TEST("config: out-of-range values are clamped") {
     json j = toJson(sampleConfig());
     j["profiles"][0]["channels"][0]["volume"] = 7.5;
     AppConfig c = configFromJson(j);
-    CHECK(c.profiles[0].channels[0].volume == 1.0f);
+    CHECK(c.profiles[0].channels[0].volume == 1.5f);  // fader maximum (+20 dB)
 }
 
 TEST("config: normalization repairs missing Main bus and dangling references") {

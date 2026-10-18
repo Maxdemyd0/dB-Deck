@@ -6,6 +6,7 @@
 #include <cmath>
 
 #include "TestFramework.h"
+#include "audio/Gain.h"
 #include "config/VoicemeeterImport.h"
 #include "graph/Validation.h"
 
@@ -126,7 +127,8 @@ TEST("import: Voicemeeter Potato routing becomes a dB-Deck profile") {
     auto has = [&](const char* s) {
         return std::any_of(r.notes.begin(), r.notes.end(), [&](const std::string& n) { return n.find(s) != std::string::npos; });
     };
-    CHECK(has("B3 was boosted"));
+    for (auto& b : p.buses)
+        if (b.name == "B3 (virtual mic)") CHECK_NEAR(20.0 * std::log10(faderToGain(b.volume)), 3.0, 0.01);  // boost kept
     CHECK(has("compressor"));
     CHECK(has("A4, which has no device"));
     CHECK(has("Close Voicemeeter"));

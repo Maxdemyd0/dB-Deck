@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { faderLabel } from "../engine/format";
+import { FADER_MAX, faderLabel } from "../engine/format";
 import { request } from "../engine/store";
 import type { Bus, Channel, ChannelRuntime, Group } from "../engine/types";
 import { Fader } from "./Fader";
@@ -47,6 +47,8 @@ export function ChannelStrip(p: Props) {
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState(c.name);
   const managed = rt?.capability === "managed";
+  // Windows session volume stops at 100%; managed audio can boost to +20 dB.
+  const canBoost = c.type !== "app" || c.appCapture;
   const status = statusInfo(c, rt);
   const offline = rt?.status === "offline" || rt?.status === "disconnected";
   const update = (args: Record<string, unknown>) => request("updateChannel", { id: c.id, ...args }).catch(() => {});
@@ -142,12 +144,13 @@ export function ChannelStrip(p: Props) {
           value={c.volume}
           label={`${c.name} volume`}
           muted={c.mute}
-          unity={c.type === "app" ? undefined : 1}
+          unity={canBoost ? 1 : undefined}
+          max={canBoost ? FADER_MAX : 1}
           title={sessionHint}
           onChange={(v) => void update({ volume: Math.round(v * 1000) / 1000 })}
         />
       </div>
-      <div className="strip-value">{faderLabel(c.volume, c.type !== "app")}</div>
+      <div className="strip-value" title={canBoost ? "Up to +20 dB" : "Windows app volume (max 100%). Enable app capture to boost."}>{faderLabel(c.volume, c.type !== "app")}</div>
 
       {view === "advanced" && managed && (
         <div className="col" style={{ gap: 4 }}>

@@ -97,6 +97,11 @@ TEST("gain: dB conversions and fader taper") {
     CHECK(faderToGain(1.0f) == 1.0f);
     CHECK_NEAR(linearToDb(faderToGain(0.5f)), -12.04, 0.01);
     float l, r;
+    // Boost range above unity: linear in dB up to +20 dB at the top.
+    CHECK_NEAR(linearToDb(faderToGain(kFaderMax)), 20.0, 0.01);
+    CHECK_NEAR(linearToDb(faderToGain(1.25f)), 10.0, 0.01);
+    CHECK(faderToGain(9.0f) == faderToGain(kFaderMax));
+    for (float db : {-30.0f, -6.0f, 0.0f, 6.0f, 20.0f}) CHECK_NEAR(linearToDb(faderToGain(dbToFader(db))), db, 0.01);
     balanceGains(0.0f, l, r);
     CHECK(l == 1.0f && r == 1.0f);
     balanceGains(-1.0f, l, r);

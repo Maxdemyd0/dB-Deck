@@ -1,4 +1,4 @@
-import { faderLabel } from "../engine/format";
+import { FADER_MAX, faderLabel } from "../engine/format";
 import { request } from "../engine/store";
 import type { Bus, BusRuntime, Device } from "../engine/types";
 import { Fader } from "./Fader";
@@ -47,7 +47,7 @@ export function BusStrip({ bus, runtime, devices, onEffects }: { bus: Bus; runti
       </div>
       <div className="strip-body">
         <Meter kind="buses" id={bus.id} />
-        <Fader value={bus.volume} unity={1} label={`${bus.name} level`} muted={bus.mute} onChange={(v) => void update({ volume: Math.round(v * 1000) / 1000 })} />
+        <Fader value={bus.volume} unity={1} max={FADER_MAX} label={`${bus.name} level`} muted={bus.mute} onChange={(v) => void update({ volume: Math.round(v * 1000) / 1000 })} />
       </div>
       <div className="strip-value">{faderLabel(bus.volume, true)}</div>
       <div className="strip-foot">

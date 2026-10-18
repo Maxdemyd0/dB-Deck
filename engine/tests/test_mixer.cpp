@@ -234,6 +234,14 @@ TEST("mixer: effects in a channel chain process the PCM") {
     CHECK_NEAR(testsig::toneAmplitude(r.run(100), 0, 48000, 500), 0.2, 0.01);
 }
 
+TEST("mixer: fader boost above unity raises the level (+6 dB doubles amplitude)") {
+    Rig r;
+    r.addTone("a", 500, 0.1f).volume = dbToFader(6.0206f);
+    r.profile.mainBus()->volume = dbToFader(6.0206f);  // bus boost too: +12 dB total
+    r.compile();
+    CHECK_NEAR(testsig::toneAmplitude(r.run(100), 0, 48000, 500), 0.4, 0.01);
+}
+
 TEST("mixer: balance pans channel") {
     Rig r;
     r.addTone("a", 500, 0.4f).balance = 1.0f;  // hard right

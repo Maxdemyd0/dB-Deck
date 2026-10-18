@@ -6,7 +6,7 @@ import { Icon } from "./components/Icon";
 import { Modal, Toasts } from "./components/Overlay";
 import { WindowsVolume } from "./components/WindowsVolume";
 import { busStatus } from "./components/BusStrip";
-import { faderLabel } from "./engine/format";
+import { FADER_MAX, faderLabel } from "./engine/format";
 import { inTauri, request, startEngineStore, useEngine } from "./engine/store";
 import type { EngineState } from "./engine/types";
 import { InputsPage, OutputsPage, RoutingPage, VirtualDevicesPage } from "./pages/DevicePages";
@@ -198,7 +198,7 @@ function Toolbar({ state, connected, view, setView }: { state: EngineState | nul
           {main && (
             <div className="vol-widget" title="dB-Deck Main bus level (managed audio)">
               <span className="tb-label">Main</span>
-              <input className="hslider" type="range" min={0} max={1} step={0.01} value={main.volume} aria-label="Main bus level" onChange={(e) => request("updateBus", { id: main.id, volume: Number(e.target.value) }, true).catch(() => {})} />
+              <input className="hslider" type="range" min={0} max={FADER_MAX} step={0.01} value={main.volume} aria-label="Main bus level (up to +20 dB)" onDoubleClick={() => request("updateBus", { id: main.id, volume: 1 }).catch(() => {})} onChange={(e) => request("updateBus", { id: main.id, volume: Number(e.target.value) }, true).catch(() => {})} />
               <span className="pct" style={{ width: 54 }}>{faderLabel(main.volume, true)}</span>
             </div>
           )}

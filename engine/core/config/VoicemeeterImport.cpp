@@ -1,5 +1,7 @@
 #include "config/VoicemeeterImport.h"
 
+#include "audio/Gain.h"
+
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -162,11 +164,10 @@ VoicemeeterImportResult importVoicemeeter(const std::string& xml, const std::vec
     std::map<std::string, std::string> busIdFor;  // "A1" / "B2" -> dB-Deck bus id
     auto busLevel = [&](BusConfig& b, const Attrs& a, const std::string& vmName) {
         const double db = toDouble(a, "dblevel");
-        const double lin = std::pow(10.0, std::min(db, 0.0) / 20.0);
-        b.volume = static_cast<float>(std::clamp(std::sqrt(lin), 0.0, 1.0));
+        b.volume = dbToFader(static_cast<float>(db));
         b.mute = toInt(a, "mute") != 0;
-        if (db > 0.05)
-            r.notes.push_back(vmName + " was boosted " + fmtDb(db) + "; dB-Deck bus faders stop at 0 dB, so it is set to 0 dB.");
+        if (db > kFaderMaxBoostDb + 0.05)
+            r.notes.push_back(vmName + " was boosted " + fmtDb(db) + "; dB-Deck faders stop at +20 dB, so it is set to +20 dB.");
     };
     bool mainAssigned = false;
     for (int k = 1; k <= aBuses; ++k) {

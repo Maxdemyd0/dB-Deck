@@ -9,13 +9,25 @@ namespace dbdeck {
 inline float dbToLinear(float db) { return db <= -144.0f ? 0.0f : std::pow(10.0f, db / 20.0f); }
 inline float linearToDb(float lin) { return lin <= 1e-8f ? -160.0f : 20.0f * std::log10(lin); }
 
-// Fader taper used for managed (engine-processed) audio. A fader position of
-// 1.0 is unity gain; 0.5 is about -12 dB; 0 is silence. Windows session volume
-// (application channels) uses the raw fader scalar instead, matching the
-// Windows Volume Mixer.
+// Fader taper used for managed (engine-processed) audio. Positions 0..1 use a
+// squared taper (1.0 = unity / 0 dB, 0.5 = about -12 dB, 0 = silence).
+// Positions above 1.0 boost linearly in dB up to kFaderMaxBoostDb at
+// kFaderMax, so 0 dB sits at two thirds of the fader travel. Windows session
+// volume (application channels) uses the raw 0..1 scalar instead, matching
+// the Windows Volume Mixer, and cannot boost.
+constexpr float kFaderMax = 1.5f;
+constexpr float kFaderMaxBoostDb = 20.0f;
+
 inline float faderToGain(float position) {
-    const float p = std::clamp(position, 0.0f, 1.0f);
-    return p * p;
+    const float p = std::clamp(position, 0.0f, kFaderMax);
+    if (p <= 1.0f) return p * p;
+    return std::pow(10.0f, (p - 1.0f) / (kFaderMax - 1.0f) * kFaderMaxBoostDb / 20.0f);
+}
+
+// Inverse of faderToGain for a level in dB (clamped to the fader range).
+inline float dbToFader(float db) {
+    if (db <= 0.0f) return std::sqrt(std::pow(10.0f, std::max(db, -144.0f) / 20.0f));
+    return 1.0f + std::min(db, kFaderMaxBoostDb) / kFaderMaxBoostDb * (kFaderMax - 1.0f);
 }
 
 // Balance law: center is unity on both sides; moving away attenuates the

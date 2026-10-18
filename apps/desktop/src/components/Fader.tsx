@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { clamp } from "../engine/format";
 
 interface Props {
-  /** Confirmed engine value, 0..1. */
+  /** Confirmed engine value, 0..max. */
   value: number;
+  /** Top of the fader travel (1 = unity only; 1.5 = boost to +20 dB). */
+  max?: number;
   /** Called while dragging (throttled) and on release. Must send to the engine. */
   onChange: (v: number) => void;
   disabled?: boolean;
@@ -20,7 +22,7 @@ interface Props {
  * locally; the moment it is released the fader shows the engine's confirmed
  * value again (which normally equals the last value sent).
  */
-export function Fader({ value, onChange, disabled, muted, label, unity, resetValue = 1, title }: Props) {
+export function Fader({ value, onChange, disabled, muted, label, unity, resetValue = 1, title, max = 1 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<number | null>(null);
   const lastSent = useRef(0);
@@ -49,11 +51,12 @@ export function Fader({ value, onChange, disabled, muted, label, unity, resetVal
 
   const posFromEvent = (clientY: number) => {
     const r = ref.current!.getBoundingClientRect();
-    return clamp(1 - (clientY - r.top - 10) / (r.height - 20), 0, 1);
+    return clamp(1 - (clientY - r.top - 10) / (r.height - 20), 0, 1) * max;
   };
 
   const shown = drag ?? value;
-  const pct = shown * 100;
+  const pos = clamp(shown / max, 0, 1);  // 0..1 along the track
+  const pct = pos * 100;
 
   return (
     <div
@@ -90,13 +93,13 @@ export function Fader({ value, onChange, disabled, muted, label, unity, resetVal
       onDoubleClick={() => !disabled && send(resetValue, true)}
       onWheel={(e) => {
         if (disabled) return;
-        send(clamp(value + (e.deltaY < 0 ? 0.02 : -0.02), 0, 1), true);
+        send(clamp(value + (e.deltaY < 0 ? 0.02 : -0.02), 0, max), true);
       }}
       onKeyDown={(e) => {
         if (disabled) return;
         const step = e.shiftKey ? 0.1 : 0.02;
-        if (e.key === "ArrowUp" || e.key === "ArrowRight") send(clamp(value + step, 0, 1), true);
-        else if (e.key === "ArrowDown" || e.key === "ArrowLeft") send(clamp(value - step, 0, 1), true);
+        if (e.key === "ArrowUp" || e.key === "ArrowRight") send(clamp(value + step, 0, max), true);
+        else if (e.key === "ArrowDown" || e.key === "ArrowLeft") send(clamp(value - step, 0, max), true);
         else if (e.key === "Home") send(1, true);
         else if (e.key === "End") send(0, true);
         else return;
@@ -104,9 +107,9 @@ export function Fader({ value, onChange, disabled, muted, label, unity, resetVal
       }}
     >
       <div className="track" />
-      <div className="fill" style={{ height: `calc((100% - 20px) * ${shown})` }} />
-      {unity !== undefined && <div className="unity" style={{ bottom: `calc(10px + (100% - 20px) * ${unity})` }} />}
-      <div className="cap" style={{ bottom: `calc(10px + (100% - 20px) * ${shown})` }} />
+      <div className="fill" style={{ height: `calc((100% - 20px) * ${pos})` }} />
+      {unity !== undefined && <div className="unity" title="0 dB" style={{ bottom: `calc(10px + (100% - 20px) * ${unity / max})` }} />}
+      <div className="cap" style={{ bottom: `calc(10px + (100% - 20px) * ${pos})` }} />
     </div>
   );
 }

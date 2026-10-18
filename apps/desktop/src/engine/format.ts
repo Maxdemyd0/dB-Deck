@@ -1,9 +1,14 @@
 // Display helpers. Kept pure for unit testing.
 
-/** Fader position (0..1) to engine gain, matching engine/core/audio/Gain.h. */
+/** Top of a managed fader (+20 dB); 1.0 is unity. Mirrors engine/core/audio/Gain.h. */
+export const FADER_MAX = 1.5;
+export const FADER_MAX_BOOST_DB = 20;
+
+/** Fader value (0..FADER_MAX) to engine gain, matching engine/core/audio/Gain.h. */
 export function faderToGain(p: number): number {
-  const c = Math.min(1, Math.max(0, p));
-  return c * c;
+  const c = Math.min(FADER_MAX, Math.max(0, p));
+  if (c <= 1) return c * c;
+  return Math.pow(10, (((c - 1) / (FADER_MAX - 1)) * FADER_MAX_BOOST_DB) / 20);
 }
 
 export function gainToDb(g: number): number {
