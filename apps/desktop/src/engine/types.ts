@@ -81,6 +81,8 @@ export interface ChannelRuntime {
   error: string;
   sessions: { pid: number; deviceId: string; deviceName: string; state: string; volume: number; mute: boolean }[];
   iconKey: string;
+  /** Windows per-app output preference; "" = Windows default; null = app not running. */
+  appOutputDeviceId: string | null;
   sends: Record<string, { state: SendState; reason: string }>;
   captures: { pid: number; format: string; bufferMs: number; status: string; stream: StreamStats }[];
 }

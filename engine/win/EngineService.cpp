@@ -141,6 +141,8 @@ bool EngineService::start(std::string& error) {
             },
             error))
         return false;
+    appOutput_ = std::make_unique<AppOutputRouting>();
+    if (!appOutput_->available()) log::warn(appOutput_->unavailableReason());
     sessions_ = std::make_unique<SessionManager>(devices_, [this] { post([this] { sessionsDirty_ = true; }); });
 
     auto volumeNotify = [this](bool isMain) {
@@ -816,7 +818,18 @@ json EngineService::channelRuntimeJson(const ChannelConfig& c) {
     for (auto& cs : src.captures)
         captures.push_back({{"pid", cs->pid()}, {"format", cs->format().describe()}, {"bufferMs", cs->bufferMs()},
                             {"status", streamStatusName(cs->status())}, {"stream", streamStatsJson(cs->stream()->stats())}});
+    // Windows' per-app output preference ("" = follows the Windows default).
+    std::string appOutput;
+    bool appOutputKnown = false;
+    if (c.type == ChannelType::App && appOutput_ && appOutput_->available())
+        for (auto* s : sessions_->matching(c.match))
+            if (!s->system) {
+                appOutput = appOutput_->getOutput(s->pid);
+                appOutputKnown = true;
+                break;
+            }
     return {{"status", channelStatus(c)},
+            {"appOutputDeviceId", appOutputKnown ? json(appOutput) : json(nullptr)},
             {"capability", managed ? "managed" : (c.type == ChannelType::App ? "session" : "none")},
             {"error", src.error},
             {"sessions", sessions},
@@ -1041,6 +1054,7 @@ void EngineService::registerCommands() {
                       {"managedRouting", true},
                       {"effects", json::array({"gain", "eq", "gate", "compressor", "limiter"})},
                       {"windowsMasterVolume", true},
+                      {"appOutputDevice", appOutput_ && appOutput_->available()},
                       {"virtualDriver", false}}}};
     };
     h["getState"] = [this](const json&) { return buildState(); };
@@ -1610,6 +1624,35 @@ void EngineService::registerCommands() {
                        {"notes", r.notes}};
         if (optBool(a, "activate").value_or(false)) execute("loadProfile", {{"id", r.profile.id}});
         return result;
+    };
+    h["setAppOutput"] = [this](const json& a) {
+        const std::string id = argString(a, "channelId");
+        const std::string dev = optString(a, "deviceId").value_or("");
+        if (!appOutput_ || !appOutput_->available())
+            throw ProtocolError("unsupported", appOutput_ ? appOutput_->unavailableReason() : "not available");
+        const ChannelConfig* c = profile().findChannel(id);
+        requireFound(c, "channel");
+        if (c->type != ChannelType::App) throw ProtocolError("bad_args", "only app channels have an output device");
+        if (!dev.empty()) {
+            const DeviceInfo* d = findDevice(dev);
+            requireFound(d, "device");
+            if (!d->render || d->state != "active") throw ProtocolError("bad_args", "choose a connected playback device");
+        }
+        std::set<uint32_t> pids;
+        for (auto* s : sessions_->matching(c->match))
+            if (!s->system) pids.insert(s->pid);
+        if (pids.empty())
+            throw ProtocolError("rejected", "Start " + c->name +
+                                                " and play something first. Windows sets an app's output while it is running "
+                                                "and then remembers it.");
+        std::string err;
+        for (uint32_t pid : pids)
+            if (!appOutput_->setOutput(pid, dev, err)) throw ProtocolError("rejected", err);
+        sessionsDirty_ = true;  // sessions move to the new device
+        markStateDirty();
+        const DeviceInfo* d = findDevice(dev);
+        log::info("App output for '" + c->name + "' set to " + (d ? d->name : "Windows default"));
+        return json{{"channelId", id}, {"deviceId", dev}, {"processes", pids.size()}};
     };
     h["setLayout"] = [this](const json& a) {
         profile().layout = argObject(a, "layout");

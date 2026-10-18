@@ -20,6 +20,7 @@ No account. No subscription. No telemetry.
 ## Features
 
 - **Per-app volume.** Apps that are playing sound appear in *Available Apps*; add them with one click. Channels remember their apps and reconnect when an app restarts.
+- **Choose each app's output device**, the same as the Windows Volume Mixer setting, from the app's channel menu.
 - **Unlimited channels and buses.** Send any input to any number of buses, each at its own level (pre- or post-fader), and chain buses into each other.
 - **Real audio engine.** A native C++ engine (WASAPI, 48 kHz, 32-bit float) captures microphones, playback devices and individual apps, and mixes them with low latency.
 - **Faders up to +20 dB**, plus mute, balance, groups and live meters.

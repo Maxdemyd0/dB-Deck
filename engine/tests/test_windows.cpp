@@ -24,6 +24,7 @@
 #include <thread>
 #include <vector>
 
+#include "AppOutputRouting.h"
 #include "AudioEngine.h"
 #include "ComUtil.h"
 #include "DeviceManager.h"
@@ -621,4 +622,51 @@ TEST("win: virtual cable carries real PCM from its playback side to its recordin
               << " Hz, capture underruns " << cap->stream()->stats().underruns << "\n";
     CHECK(amp > 0.08 && amp < 0.12);
     CHECK_NEAR(freq, 1000, 10);
+}
+
+TEST("win: per-app output device sends a real app to the chosen device (AudioPolicyConfig)") {
+    Env env;
+    AppOutputRouting routing;
+    if (!routing.available()) {
+        std::cout << "       SKIPPED: " << routing.unavailableReason() << "\n";
+        return;
+    }
+    const DeviceInfo* target = env.renderDeviceForTests();
+    if (!target) {
+        std::cout << "       SKIPPED: no test render device\n";
+        return;
+    }
+    // Windows stores the choice per executable. Set it for this test exe,
+    // then start a child of the same exe: when it opens its default output,
+    // Windows must hand it the chosen device.
+    std::string err;
+    CHECK(routing.setOutput(GetCurrentProcessId(), target->id, err));
+    CHECK(routing.getOutput(GetCurrentProcessId()) == target->id);
+    struct Reset {
+        AppOutputRouting& r;
+        ~Reset() {
+            std::string e;
+            r.setOutput(GetCurrentProcessId(), "", e);
+        }
+    } reset{routing};
+
+    wchar_t self[MAX_PATH];
+    GetModuleFileNameW(nullptr, self, MAX_PATH);
+    std::wstring cmd = L"\"" + std::wstring(self) + L"\" --play-silence 5";
+    STARTUPINFOW si{sizeof(si)};
+    PROCESS_INFORMATION pi{};
+    CHECK(CreateProcessW(nullptr, cmd.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi));
+    UniqueHandle proc(pi.hProcess), thr(pi.hThread);
+    SessionManager sm(env.dm, nullptr);
+    AppMatchRule rule = ruleForExe(std::filesystem::path(self).filename().string());
+    std::string device;
+    for (int i = 0; i < 40 && device.empty(); ++i) {
+        std::this_thread::sleep_for(100ms);
+        sm.refresh(env.devices, GetCurrentProcessId());
+        for (auto* s : sm.matching(rule))
+            if (s->pid == pi.dwProcessId) device = s->deviceId;
+    }
+    TerminateProcess(pi.hProcess, 0);
+    std::cout << "       child played on: " << (device == target->id ? target->name : device) << "\n";
+    CHECK(device == target->id);
 }

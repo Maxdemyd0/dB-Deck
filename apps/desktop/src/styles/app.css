@@ -248,3 +248,5 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .toolbar .vol-widget { flex-shrink: 0; white-space: nowrap; }
 .vol-widget .pct { white-space: nowrap; }
 @media (max-width: 1250px) { .toolbar .vol-widget .nm, .toolbar .tb-label { display: none; } .toolbar .vol-widget .hslider { width: 80px; } }
+
+.menu { max-height: 70vh; overflow-y: auto; }

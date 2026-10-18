@@ -49,6 +49,7 @@ export function MixerPage({ state, view, icons, appsOpen, searchRef }: { state: 
         runtime={rt}
         buses={visibleBuses}
         groups={p.groups}
+        devices={state.devices}
         icon={rt?.iconKey ? icons[rt.iconKey] : undefined}
         view={view}
         dragging={dragId === c.id}

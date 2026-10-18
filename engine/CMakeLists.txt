@@ -47,13 +47,14 @@ if(WIN32 AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/win/main.cpp)
         win/SessionManager.cpp
         win/IconCache.cpp
         win/EndpointVolumeController.cpp
+        win/AppOutputRouting.cpp
         win/WasapiStreams.cpp
         win/AudioEngine.cpp
         win/PipeServer.cpp
         win/EngineService.cpp)
     target_include_directories(dbdeck_win PUBLIC win)
     target_link_libraries(dbdeck_win PUBLIC dbdeck_core ole32 oleaut32 uuid avrt mmdevapi
-        windowscodecs shell32 version advapi32 user32 gdi32)
+        windowscodecs shell32 version advapi32 user32 gdi32 runtimeobject)
 
     add_executable(dbdeck-engine win/main.cpp win/engine.rc)
     target_link_libraries(dbdeck-engine PRIVATE dbdeck_win)

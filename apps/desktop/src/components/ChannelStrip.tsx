@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { FADER_MAX, faderLabel } from "../engine/format";
 import { request } from "../engine/store";
-import type { Bus, Channel, ChannelRuntime, Group } from "../engine/types";
+import type { Bus, Channel, ChannelRuntime, Device, Group } from "../engine/types";
 import { Fader } from "./Fader";
 import { Icon } from "./Icon";
 import { Meter } from "./Meter";
@@ -29,6 +29,7 @@ interface Props {
   runtime?: ChannelRuntime;
   buses: Bus[];
   groups: Group[];
+  devices: Device[];
   icon?: string;
   view: View;
   dragging: boolean;
@@ -74,6 +75,19 @@ export function ChannelStrip(p: Props) {
       onClick: () => update({ appCapture: !c.appCapture }),
     });
     menu.push({ label: "Matching rules…", onClick: p.onMatchRules });
+    // Where the app itself plays (Windows per-app output preference).
+    const current = rt?.appOutputDeviceId;
+    const setOutput = (deviceId: string) =>
+      request("setAppOutput", { channelId: c.id, deviceId }).catch(() => {});
+    menu.push({ separator: true, label: "" });
+    if (current === null || current === undefined) {
+      menu.push({ heading: true, label: "Output device (start the app to change)" });
+    } else {
+      menu.push({ heading: true, label: "App output device" });
+      menu.push({ label: "Windows default", checked: current === "", onClick: () => setOutput("") });
+      for (const d of p.devices.filter((x) => x.flow === "render" && x.state === "active"))
+        menu.push({ label: d.name, checked: current === d.id, onClick: () => setOutput(d.id) });
+    }
   }
   menu.push({ label: managed ? "Effects…" : "Effects… (needs managed audio)", disabled: !managed, onClick: p.onEffects });
   menu.push({ separator: true, label: "" });

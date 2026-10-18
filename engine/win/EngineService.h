@@ -20,6 +20,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "AppOutputRouting.h"
 #include "AudioEngine.h"
 #include "DeviceManager.h"
 #include "EndpointVolumeController.h"
@@ -117,6 +118,7 @@ private:
     std::unique_ptr<EndpointVolumeController> defaultVolume_;
     std::unique_ptr<EndpointVolumeController> mainVolume_;
     std::unique_ptr<PipeServer> pipe_;
+    std::unique_ptr<AppOutputRouting> appOutput_;
     std::set<uint64_t> helloClients_;
 
     std::unordered_map<std::string, Handler> handlers_;

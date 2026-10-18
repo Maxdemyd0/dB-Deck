@@ -30,6 +30,9 @@ Environment variables: `DBDECK_TEST_RENDER_DEVICE` (substring of the device name
 - **Live switch-over on the dev machine (2026-10-17):** installed dB-Deck (per-user NSIS, silent), imported the real file, closed Voicemeeter, loaded the profile. All outputs and inputs connected. Audio played into "Voicemeeter VAIO3 Input" **with Voicemeeter closed** was captured by dB-Deck (peak 0.48) and reached Main, Realtek and the Headphones bus. So the VAIO playback endpoints keep working as dB-Deck inputs without the Voicemeeter app.
 - **VB-CABLE round trip:** 1 kHz at 0.1 into "CABLE Input" through the engine arrived on "CABLE Output" at 0.0988 / 1000.06 Hz (1 underrun at stream start). VB-CABLE exposes two playback sides ("CABLE Input", "CABLE In 16ch"), and both are recognised as feeding CABLE Output for feedback protection.
 
+## Per-app output device
+- Uses the undocumented `Windows.Media.Internal.AudioPolicyConfig` factory (the same one Windows Settings uses). The test sets the preference for its own executable, starts a child of the same executable, and checks that the child's real audio session opens on the chosen device. On the dev machine (Windows default = CABLE Input) the child played on "Dummy Output (Voicemod)" as chosen; the preference is reset afterwards.
+
 ## Virtual driver (static only)
 - Built with WDK 10.0.28000 / VS 18, warnings as errors: `dbdeckvad.sys`, `.inf`, `.cat` (test-signed).
 - InfVerif `/w`: INF is valid.
