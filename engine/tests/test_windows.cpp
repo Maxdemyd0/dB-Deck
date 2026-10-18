@@ -19,6 +19,7 @@
 #include <cmath>
 #include <condition_variable>
 #include <filesystem>
+#include <map>
 #include <mutex>
 #include <thread>
 #include <vector>
@@ -34,6 +35,7 @@
 #include "TestSignals.h"
 #include "WasapiStreams.h"
 #include "audio/ToneGenerator.h"
+#include "graph/AppMatch.h"
 #include "graph/GraphCompiler.h"
 
 using namespace dbdeck;
@@ -558,16 +560,26 @@ TEST("win: IPC requires hello, rejects malformed input, serves state") {
     CHECK(std::filesystem::exists(dir / "config.json"));
 }
 
-TEST("win: dB-Deck virtual cable carries real PCM from Virtual Input to Virtual Output (driver)") {
+TEST("win: virtual cable carries real PCM from its playback side to its recording side") {
     Env env;
     const DeviceInfo* in = nullptr;
     const DeviceInfo* out = nullptr;
+    // A loopback cable: dB-Deck's driver or an adapter named as a cable
+    // (VB-CABLE), exposing exactly one playback and one recording endpoint.
+    std::map<std::string, std::pair<std::vector<const DeviceInfo*>, std::vector<const DeviceInfo*>>> byAdapter;
     for (auto& d : env.devices) {
-        if (d.state != "active" || d.adapterName.rfind("dB-Deck Virtual Cable", 0) != 0) continue;
-        (d.render ? in : out) = &d;
+        if (d.state != "active") continue;
+        const bool ours = d.adapterName.rfind("dB-Deck Virtual Cable", 0) == 0;
+        if (!ours && toLowerAscii(d.adapterName).find("cable") == std::string::npos) continue;
+        (d.render ? byAdapter[d.adapterName].first : byAdapter[d.adapterName].second).push_back(&d);
     }
+    for (auto& [adapter, rc] : byAdapter)
+        if (rc.first.size() == 1 && rc.second.size() == 1 && (!in || adapter.rfind("dB-Deck", 0) == 0)) {
+            in = rc.first[0];
+            out = rc.second[0];
+        }
     if (!in || !out) {
-        std::cout << "       SKIPPED: dB-Deck virtual cable driver not installed\n";
+        std::cout << "       SKIPPED: no virtual cable installed (dB-Deck driver or VB-CABLE)\n";
         return;
     }
     std::cout << "       playback: " << in->name << " | recording: " << out->name << "\n";

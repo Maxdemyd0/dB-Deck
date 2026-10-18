@@ -33,6 +33,7 @@ add_library(dbdeck_core STATIC
     core/graph/Mixer.cpp
     core/graph/GraphCompiler.cpp
     core/config/ConfigStore.cpp
+    core/config/VoicemeeterImport.cpp
     core/protocol/Protocol.cpp
     core/util/Log.cpp)
 target_include_directories(dbdeck_core PUBLIC core)
@@ -60,7 +61,7 @@ endif()
 
 if(DBDECK_BUILD_TESTS)
     enable_testing()
-    add_executable(dbdeck-tests tests/test_main.cpp tests/test_core.cpp tests/test_mixer.cpp tests/test_config.cpp)
+    add_executable(dbdeck-tests tests/test_main.cpp tests/test_core.cpp tests/test_mixer.cpp tests/test_config.cpp tests/test_import.cpp)
     target_link_libraries(dbdeck-tests PRIVATE dbdeck_core)
     add_test(NAME core COMMAND dbdeck-tests)
 

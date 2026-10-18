@@ -20,6 +20,7 @@ dB-Deck is a free, open-source (MIT) audio mixer for Windows 11. It aims to comb
 | Profiles, scenes, undo, atomic config with last-known-good recovery | ✅ |
 | Tray: close-to-tray, mute all, profile switch, Main status, exit with warning | ✅ |
 | Engine runs as a separate process; survives UI crashes; UI restarts the engine if it dies | ✅ verified |
+| Import from Voicemeeter (Standard/Banana/Potato settings → dB-Deck profile) | ✅ tested on a real Potato settings file |
 | NSIS installer (per-user) | ✅ builds |
 | dB-Deck virtual cable driver | 🟡 builds (test-signed, InfVerif valid); **not installed or runtime-tested**. See [driver/windows](driver/windows/README.md) |
 | On-demand creation of many virtual devices | ❌ not started (see [DRIVER_PLAN](docs/DRIVER_PLAN.md)) |

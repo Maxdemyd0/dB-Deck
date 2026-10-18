@@ -27,6 +27,12 @@ Engine CLI for debugging: `python scripts/engine-cli.py getState`, or `--events 
 - **Cable feedback protection** pairs playback/recording sides only for dB-Deck's driver and adapters named as cables with exactly one endpoint each way. A loopback device named differently (or a multi-cable adapter) is not paired, so a loop through it is not prevented.
 - `tauri.conf.json` warns that `STATIC_VCRUNTIME` is deprecated. This is cosmetic.
 
+## Replacing Voicemeeter on a Secure Boot PC (no own driver)
+1. Install VB-CABLE (free, Microsoft-signed) for each virtual mic needed.
+2. dB-Deck › Profiles › **Import from Voicemeeter**, then set each "B (virtual mic)" bus output to a cable's playback side.
+3. Close Voicemeeter (and disable its startup), then load the imported profile. Apps keep playing to the Voicemeeter VAIO endpoints, and dB-Deck captures them.
+4. In Discord/OBS, choose the cable's recording side (e.g. CABLE Output) as the microphone.
+
 ## Next engineering steps
 1. Manually verify Quick Settings ⇄ dB-Deck, device unplug/replug, sleep/resume, and app capture with Discord/a game. Add results to TESTING.md.
 2. Install-test the NSIS installer on a clean VM (Start with Windows, uninstall stops the engine and removes the Run key).

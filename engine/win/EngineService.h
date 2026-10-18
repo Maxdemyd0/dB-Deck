@@ -79,6 +79,7 @@ private:
     void applySessionVolumes();
     void adoptExternalSessionChanges();
     void refreshDevices();
+    void adoptDevicesByName();
     void refreshSessions();
     void rebindEndpointVolumes();
     void markDirty();

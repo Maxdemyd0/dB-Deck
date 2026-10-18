@@ -1,9 +1,13 @@
 #include "EngineService.h"
 
+#include <shlobj.h>
 #include <tlhelp32.h>
 
 #include <algorithm>
+#include <fstream>
+#include <sstream>
 
+#include "config/VoicemeeterImport.h"
 #include "graph/AppMatch.h"
 #include "graph/Scenes.h"
 #include "graph/Validation.h"
@@ -310,8 +314,38 @@ void EngineService::markDirty() {
 
 void EngineService::refreshDevices() {
     deviceList_ = devices_.enumerate();
+    adoptDevicesByName();
     rebindEndpointVolumes();
     markStateDirty();
+}
+
+void EngineService::adoptDevicesByName() {
+    // Entries that only know a device by name (e.g. imported while the device
+    // was unplugged) bind to its stable ID as soon as a matching endpoint exists.
+    auto byName = [&](const std::string& name, bool render) -> const DeviceInfo* {
+        if (name.empty()) return nullptr;
+        for (auto& d : deviceList_)
+            if (d.render == render && d.name == name) return &d;
+        return nullptr;
+    };
+    for (auto& p : config_.profiles) {
+        for (auto& b : p.buses)
+            if (b.deviceId.empty() && !b.deviceName.empty())
+                if (const DeviceInfo* d = byName(b.deviceName, true)) {
+                    b.deviceId = d->id;
+                    log::info("Bus '" + b.name + "' bound to " + d->name);
+                    markDirty();
+                }
+        for (auto& c : p.channels) {
+            if (!c.deviceId.empty() || c.deviceName.empty()) continue;
+            if (c.type != ChannelType::HardwareInput && c.type != ChannelType::EndpointLoopback) continue;
+            if (const DeviceInfo* d = byName(c.deviceName, c.type == ChannelType::EndpointLoopback)) {
+                c.deviceId = d->id;
+                log::info("Channel '" + c.name + "' bound to " + d->name);
+                markDirty();
+            }
+        }
+    }
 }
 
 void EngineService::refreshSessions() {
@@ -1519,6 +1553,58 @@ void EngineService::registerCommands() {
         }
         return json{{"bufferMode", config_.settings.bufferMode}, {"meterRateHz", config_.settings.meterRateHz},
                     {"showSystemSounds", config_.settings.showSystemSounds}};
+    };
+    h["importVoicemeeter"] = [this](const json& a) {
+        std::filesystem::path path;
+        if (auto p = optString(a, "path"); p && !p->empty()) {
+            path = std::filesystem::path(toWide(*p));
+        } else {
+            // Newest Voicemeeter*_LastSettings.xml in Documents\Voicemeeter.
+            PWSTR docs = nullptr;
+            std::filesystem::path dir;
+            if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Documents, 0, nullptr, &docs))) dir = std::filesystem::path(docs) / L"Voicemeeter";
+            CoTaskMemFree(docs);
+            std::error_code ec;
+            std::filesystem::file_time_type newest{};
+            for (auto& e : std::filesystem::directory_iterator(dir, ec)) {
+                const std::wstring n = e.path().filename().wstring();
+                if (n.rfind(L"Voicemeeter", 0) == 0 && n.size() > 21 && n.ends_with(L"_LastSettings.xml") &&
+                    (path.empty() || e.last_write_time() > newest)) {
+                    path = e.path();
+                    newest = e.last_write_time();
+                }
+            }
+            if (path.empty()) throw ProtocolError("not_found", "No Voicemeeter settings were found in Documents\\Voicemeeter");
+        }
+        std::ifstream f(path, std::ios::binary);
+        if (!f) throw ProtocolError("not_found", "Cannot read " + toUtf8(path.wstring()));
+        std::ostringstream ss;
+        ss << f.rdbuf();
+        if (ss.str().size() > 8 * 1024 * 1024) throw ProtocolError("bad_args", "file is too large");
+
+        std::vector<ImportDevice> devs;
+        for (auto& d : deviceList_) devs.push_back({d.id, d.name, d.render});
+        VoicemeeterImportResult r;
+        try {
+            r = importVoicemeeter(ss.str(), devs, "Voicemeeter import");
+        } catch (const ConfigError& e) {
+            throw ProtocolError("rejected", std::string("Could not import: ") + e.what());
+        }
+        r.profile.name = "Voicemeeter " + r.edition + " import";
+        if (auto issue = validateRouting(r.profile, cablePairs()))
+            throw ProtocolError("rejected", "The imported routing would create a loop: " + issue->message);
+        config_.profiles.push_back(r.profile);
+        markDirty();
+        log::info("Imported " + toUtf8(path.wstring()) + " as profile '" + r.profile.name + "'");
+        json result = {{"profileId", r.profile.id},
+                       {"profileName", r.profile.name},
+                       {"edition", r.edition},
+                       {"source", toUtf8(path.wstring())},
+                       {"channels", r.profile.channels.size()},
+                       {"buses", r.profile.buses.size()},
+                       {"notes", r.notes}};
+        if (optBool(a, "activate").value_or(false)) execute("loadProfile", {{"id", r.profile.id}});
+        return result;
     };
     h["setLayout"] = [this](const json& a) {
         profile().layout = argObject(a, "layout");

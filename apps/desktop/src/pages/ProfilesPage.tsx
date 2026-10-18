@@ -1,13 +1,32 @@
 import { useState } from "react";
 import { Icon } from "../components/Icon";
-import { Prompt } from "../components/Overlay";
+import { Modal, Prompt } from "../components/Overlay";
 import { request } from "../engine/store";
 import type { EngineState } from "../engine/types";
+
+interface ImportResult {
+  profileId: string;
+  profileName: string;
+  edition: string;
+  source: string;
+  channels: number;
+  buses: number;
+  notes: string[];
+}
 
 type PromptState = { title: string; initial: string; submit: string; run: (v: string) => void } | null;
 
 export function ProfilesPage({ state }: { state: EngineState }) {
   const [prompt, setPrompt] = useState<PromptState>(null);
+  const [imported, setImported] = useState<ImportResult | null>(null);
+  const [importing, setImporting] = useState(false);
+  const runImport = () => {
+    setImporting(true);
+    request<ImportResult>("importVoicemeeter")
+      .then(setImported)
+      .catch(() => {})
+      .finally(() => setImporting(false));
+  };
   const active = state.activeProfileId;
   const scenes = state.profile.scenes;
   return (
@@ -26,6 +45,9 @@ export function ProfilesPage({ state }: { state: EngineState }) {
             </button>
             <button className="btn small" onClick={() => setPrompt({ title: "Duplicate current profile", initial: `${state.profile.name} copy`, submit: "Duplicate", run: (name) => request("createProfile", { name, copyCurrent: true }).catch(() => {}) })}>
               Duplicate
+            </button>
+            <button className="btn small" disabled={importing} title="Create a profile from your Voicemeeter settings (Documents\Voicemeeter)" onClick={runImport}>
+              {importing ? "Importing…" : "Import from Voicemeeter"}
             </button>
           </div>
           <div className="list">
@@ -62,6 +84,29 @@ export function ProfilesPage({ state }: { state: EngineState }) {
           </div>
         </div>
       </div>
+      {imported && (
+        <Modal
+          title={`Imported "${imported.profileName}"`}
+          onClose={() => setImported(null)}
+          wide
+          actions={
+            <>
+              <button className="btn" onClick={() => setImported(null)}>Keep current profile</button>
+              <button className="btn primary" onClick={() => request("loadProfile", { id: imported.profileId }).then(() => setImported(null)).catch(() => {})}>
+                Load it now
+              </button>
+            </>
+          }
+        >
+          <p className="muted small" style={{ marginTop: 4 }}>
+            {imported.channels} channels and {imported.buses} buses from Voicemeeter {imported.edition}
+            <span className="faint"> ({imported.source})</span>.
+          </p>
+          <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.6 }}>
+            {imported.notes.map((n, i) => <li key={i}>{n}</li>)}
+          </ul>
+        </Modal>
+      )}
       {prompt && <Prompt title={prompt.title} label="Name" initial={prompt.initial} submitLabel={prompt.submit} onSubmit={prompt.run} onClose={() => setPrompt(null)} />}
     </div>
   );

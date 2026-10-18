@@ -24,6 +24,11 @@ Machine: Windows 11 Home 10.0.26200, 15 playback / 14 recording endpoints (Realt
 
 Environment variables: `DBDECK_TEST_RENDER_DEVICE` (substring of the device name, default "Dummy Output"), `DBDECK_TEST_SKIP_MASTER=1`.
 
+## Voicemeeter import
+- Unit tests (synthetic Potato file): strips, buses, routing, gains, mutes, missing devices, skipped/unsupported features, invalid files.
+- Real file (`Documents\Voicemeeter\VoicemeeterPotato_LastSettings.xml` on the dev machine), imported into a temporary engine: 5 channels and 6 buses that match the Voicemeeter routing (VAIO3 → USBMIC1 + Realtek + WH202A; AUX +11.6 dB → Main + B1; Voicemod mic → B1/B2; NVIDIA Broadcast mic → B3). A3 (WH202A, not connected) is kept by name and binds when the device appears.
+- Not yet verified: whether Voicemeeter's VAIO playback endpoints still deliver audio to loopback capture while the Voicemeeter app is closed.
+
 ## Virtual driver (static only)
 - Built with WDK 10.0.28000 / VS 18, warnings as errors: `dbdeckvad.sys`, `.inf`, `.cat` (test-signed).
 - InfVerif `/w`: INF is valid.
