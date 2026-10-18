@@ -1,6 +1,6 @@
 [package]
 name = "dbdeck"
-version = "0.1.0"
+version = "1.0.0"
 description = "dB-Deck - free Windows audio mixer"
 authors = ["dB-Deck contributors"]
 license = "MIT"

@@ -50,7 +50,7 @@ int wmain(int argc, wchar_t** argv) {
         else if (a == L"--pipe" && i + 1 < argc) opts.pipeName = std::wstring(L"\\\\.\\pipe\\") + argv[++i];
         else if (a == L"--quiet") quiet = true;
         else if (a == L"--version") {
-            std::printf("dB-Deck engine 0.1.0 (protocol %d)\n", kProtocolVersion);
+            std::printf("dB-Deck engine 1.0.0 (protocol %d)\n", kProtocolVersion);
             return 0;
         }
     }

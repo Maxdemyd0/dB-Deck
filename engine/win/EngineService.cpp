@@ -17,7 +17,7 @@ namespace dbdeck::win {
 
 namespace {
 
-constexpr const char* kEngineVersion = "0.1.0";
+constexpr const char* kEngineVersion = "1.0.0";
 constexpr size_t kMaxUndo = 50;
 
 std::map<uint32_t, uint32_t> parentPids() {

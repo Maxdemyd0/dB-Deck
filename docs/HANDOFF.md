@@ -1,4 +1,4 @@
-# Handoff: dB-Deck 0.1.0
+# Handoff: dB-Deck 1.0.0
 
 ## Milestone status
 | Milestone | Status |

@@ -1,57 +1,101 @@
+<div align="center">
+
+<img src="apps/desktop/app-icon.svg" width="96" alt="dB-Deck logo">
+
 # dB-Deck
 
-**Unlimited channels. Real audio routing. Free software. Simple interface.**
+**A free, open-source audio mixer for Windows.**
+Per-app volume, unlimited channels and buses, real audio routing.
 
-dB-Deck is a free, open-source (MIT) audio mixer for Windows 11. It aims to combine the simplicity of the Windows Volume Mixer with Voicemeeter-style routing, without artificial strip or bus limits. It has no account, no subscription and no telemetry.
+[Download](https://github.com/Maxdemyd0/dB-Deck/releases/latest) · [Features](#features) · [Switching from Voicemeeter](#switching-from-voicemeeter) · [Build](#building-from-source)
 
-> **Status: early (0.1.0).** The app-volume mixer, managed audio graph, Windows master-volume sync and desktop app work and are tested on real hardware. dB-Deck's **virtual cable driver builds but has not been installed or tested yet** (it needs a test-signing VM). Meanwhile, existing virtual cables (VB-Audio, Voicemeeter) can be used as inputs and outputs. See [docs/HANDOFF.md](docs/HANDOFF.md) for exactly what works.
+</div>
 
-## What works today
+---
 
-| Feature | State |
-|---|---|
-| Per-app volume and mute (Windows audio sessions), persistent channels that reconnect when apps restart | ✅ verified on real sessions |
-| Available Apps panel with icons, search, one-click add | ✅ |
-| Windows master volume ⇄ dB-Deck (Quick Settings, volume keys, mute), default-device rebinding | ✅ verified |
-| Managed audio engine: microphones, playback loopback, per-app capture, test tones | ✅ verified (capture + render through real endpoints) |
-| Unlimited buses, per-channel sends (pre/post), bus-to-bus, groups, master mute | ✅ unit + audio tested |
-| Main output independent of the Windows default, explicit fallbacks only, auto-reconnect | ✅ |
-| DSP: gain, 3-band EQ, gate, compressor, limiter (click-free bypass) | ✅ audio tested |
-| Profiles, scenes, undo, atomic config with last-known-good recovery | ✅ |
-| Tray: close-to-tray, mute all, profile switch, Main status, exit with warning | ✅ |
-| Engine runs as a separate process; survives UI crashes; UI restarts the engine if it dies | ✅ verified |
-| Import from Voicemeeter (Standard/Banana/Potato settings → dB-Deck profile) | ✅ tested on a real Potato settings file |
-| NSIS installer (per-user) | ✅ builds |
-| dB-Deck virtual cable driver | 🟡 builds (test-signed, InfVerif valid); **not installed or runtime-tested**. See [driver/windows](driver/windows/README.md) |
-| On-demand creation of many virtual devices | ❌ not started (see [DRIVER_PLAN](docs/DRIVER_PLAN.md)) |
+dB-Deck combines the simplicity of the Windows Volume Mixer with Voicemeeter-style routing. Add an app, move its fader, and you're done. When you need more, add mixes for your stream or a virtual mic for Discord, and process your microphone. You aren't limited to a fixed number of strips or buses.
 
-## Layout
+No account. No subscription. No telemetry.
 
-```
-apps/desktop/        Tauri 2 shell (Rust) + React/TypeScript UI
-engine/              C++20 audio engine
-  core/              platform-independent: graph, mixer, DSP, config, protocol
-  win/               WASAPI, sessions, devices, endpoint volume, named-pipe IPC
-  tests/             unit, audio and Windows integration tests
-shared/protocol/     IPC protocol reference
-shared/schemas/      configuration JSON schema
-installer/           NSIS hooks
-driver/windows/      virtual cable driver (WDK, MS-PL, derived from SimpleAudioSample)
-docs/                architecture, decisions, testing, handoff
-scripts/             build scripts and a dev CLI for the engine
-```
+## Features
 
-## Building
+- **Per-app volume.** Apps that are playing sound appear in *Available Apps*; add them with one click. Channels remember their apps and reconnect when an app restarts.
+- **Unlimited channels and buses.** Send any input to any number of buses, each at its own level (pre- or post-fader), and chain buses into each other.
+- **Real audio engine.** A native C++ engine (WASAPI, 48 kHz, 32-bit float) captures microphones, playback devices and individual apps, and mixes them with low latency.
+- **Faders up to +20 dB**, plus mute, balance, groups and live meters.
+- **Effects.** EQ, noise gate, compressor, limiter and gain, applied to the actual audio.
+- **Main output stays where you put it.** It plays on the device you choose, independent of the Windows default, reconnects automatically, and only falls back to devices you approve.
+- **Windows volume sync.** The toolbar's Windows volume follows Quick Settings and your keyboard volume keys, and moving it changes Windows' volume too.
+- **Profiles and scenes.** Switch whole setups, or swap levels instantly.
+- **Import from Voicemeeter.** Turns your Voicemeeter Standard, Banana or Potato settings into a dB-Deck profile.
+- **Runs in the tray.** Closing the window keeps audio running. It can start with Windows.
+- **Safe by design.** It rejects routing loops and feedback, and never plays a captured app twice on the same device.
 
-Requirements: Windows 11 x64, Visual Studio 2022+ with the C++ workload (MSVC, CMake, Ninja), Windows SDK 10.0.22621+, Rust (stable, MSVC), Node.js 20+. CMake downloads nlohmann/json 3.11.3 (pinned by hash).
+## Install
+
+1. Download `dB-Deck_1.0.0_x64-setup.exe` from the [latest release](https://github.com/Maxdemyd0/dB-Deck/releases/latest).
+2. Run it. It installs for your user only, so no administrator rights are needed.
+
+Windows SmartScreen may warn that the publisher is unknown, because the installer isn't code-signed yet. Choose **More info › Run anyway**.
+
+**Requirements:** Windows 11, 64-bit (tested). Windows 10 version 2004 or later should work but hasn't been tested.
+
+## Getting started
+
+1. Open dB-Deck and pick your speakers or headphones as **Main** in the toolbar.
+2. Click **+** next to an app in **Available Apps** to control its volume.
+3. Use **Add channel** for a microphone, or to capture a playback device.
+4. Switch to the **Mixer** or **Advanced** view for buses, sends, effects and the routing matrix.
+
+### Virtual microphone (Discord, OBS, …)
+
+dB-Deck's own virtual-device driver isn't signed yet (see [Status](#status)). Meanwhile, use the free, Microsoft-signed [VB-CABLE](https://vb-audio.com/Cable/):
+
+1. Install VB-CABLE.
+2. In dB-Deck, create a bus (for example *Discord Mic*), set its output to **CABLE Input**, and send your mic and any apps to it.
+3. In Discord or OBS, choose **CABLE Output** as the microphone.
+
+## Switching from Voicemeeter
+
+1. **Profiles › Import from Voicemeeter.** dB-Deck reads your latest Voicemeeter settings and builds the same routing: your inputs, the Voicemeeter virtual inputs your apps already play to, and your A outputs. It tells you what it couldn't carry over.
+2. Point each former **B** output (virtual mic) at a VB-CABLE, as described above.
+3. Close Voicemeeter, remove it from startup, and load the imported profile.
+
+Your apps keep playing to the same devices, so nothing else needs changing.
+
+## Status
+
+dB-Deck **1.0.0** is the first public release. Tested on real hardware so far:
+
+- Per-app volume
+- Capture and playback through the engine (measured playback latency about 23 ms)
+- Windows volume sync
+- VB-CABLE routing
+- The Voicemeeter import
+
+Known limitations:
+
+- **No own virtual devices yet.** The included virtual cable driver (`driver/windows`) builds but is only test-signed. Using it needs Windows test mode with Secure Boot off, so for now use VB-CABLE.
+- **Some things haven't been tested on real hardware yet:** unplugging and reconnecting devices, sleep and resume, and per-app capture with every kind of app.
+- **The installer isn't code-signed.**
+
+See [docs/TESTING.md](docs/TESTING.md) for exactly what has been verified, and [docs/HANDOFF.md](docs/HANDOFF.md) for open issues.
+
+## Building from source
+
+**Requirements:**
+- Visual Studio 2022 or newer with the C++ workload (MSVC, CMake, Ninja)
+- Windows SDK
+- Rust (stable, MSVC)
+- Node.js 20+
 
 ```bash
 scripts\build-release.cmd
 ```
 
-This builds the engine, runs the core tests, stages the engine as a Tauri sidecar and produces `apps/desktop/src-tauri/target/release/bundle/nsis/dB-Deck_0.1.0_x64-setup.exe`.
+This builds and tests the engine, then produces the installer in `apps/desktop/src-tauri/target/release/bundle/nsis/`.
 
-Development:
+For development:
 
 ```bash
 scripts\build-engine.cmd Release
@@ -61,15 +105,13 @@ scripts\build-engine.cmd Release
 cd apps/desktop && npm install && npx tauri dev
 ```
 
-In dev mode the UI starts `build/engine-Release/dbdeck-engine.exe` automatically.
-
-Driver (needs the WDK; builds and test-signs only, installs nothing):
+To build the optional driver (requires the Windows Driver Kit; builds only, installs nothing):
 
 ```bash
 scripts\build-driver.cmd
 ```
 
-## Tests
+### Tests
 
 ```bash
 build\engine-Release\dbdeck-tests.exe
@@ -83,8 +125,20 @@ build\engine-Release\dbdeck-wintests.exe
 cd apps/desktop && npx vitest run
 ```
 
-The Windows integration tests use real devices: they play a quiet tone to a device named "Dummy Output" (override with `DBDECK_TEST_RENDER_DEVICE`) and briefly change and restore the Windows volume (skip with `DBDECK_TEST_SKIP_MASTER=1`). See [docs/TESTING.md](docs/TESTING.md).
+The Windows integration tests use real audio devices. See [docs/TESTING.md](docs/TESTING.md) before running them.
+
+## Project layout
+
+| Path | Contents |
+|---|---|
+| `engine/` | C++20 audio engine: mixer, DSP, WASAPI, sessions, IPC |
+| `apps/desktop/` | Tauri 2 app: Rust shell and React/TypeScript UI |
+| `driver/windows/` | Optional virtual cable driver (WDK) |
+| `shared/` | IPC protocol reference and config schema |
+| `docs/` | Architecture, audio engine, decisions, testing |
 
 ## License
 
-MIT. See [LICENSE](LICENSE). Exception: `driver/windows/dbdeck-vad` is derived from Microsoft sample code and is licensed under MS-PL.
+[MIT](LICENSE). The optional driver in `driver/windows/dbdeck-vad` is derived from Microsoft sample code and is licensed under the [MS-PL](driver/windows/dbdeck-vad/LICENSE-MS-PL.txt).
+
+dB-Deck is not affiliated with VB-Audio. Voicemeeter and VB-CABLE are products of VB-Audio Software.
