@@ -27,7 +27,8 @@ Environment variables: `DBDECK_TEST_RENDER_DEVICE` (substring of the device name
 ## Voicemeeter import
 - Unit tests (synthetic Potato file): strips, buses, routing, gains, mutes, missing devices, skipped/unsupported features, invalid files.
 - Real file (`Documents\Voicemeeter\VoicemeeterPotato_LastSettings.xml` on the dev machine), imported into a temporary engine: 5 channels and 6 buses that match the Voicemeeter routing (VAIO3 → USBMIC1 + Realtek + WH202A; AUX +11.6 dB → Main + B1; Voicemod mic → B1/B2; NVIDIA Broadcast mic → B3). A3 (WH202A, not connected) is kept by name and binds when the device appears.
-- Not yet verified: whether Voicemeeter's VAIO playback endpoints still deliver audio to loopback capture while the Voicemeeter app is closed.
+- **Live switch-over on the dev machine (2026-10-17):** installed dB-Deck (per-user NSIS, silent), imported the real file, closed Voicemeeter, loaded the profile. All outputs and inputs connected. Audio played into "Voicemeeter VAIO3 Input" **with Voicemeeter closed** was captured by dB-Deck (peak 0.48) and reached Main, Realtek and the Headphones bus. So the VAIO playback endpoints keep working as dB-Deck inputs without the Voicemeeter app.
+- **VB-CABLE round trip:** 1 kHz at 0.1 into "CABLE Input" through the engine arrived on "CABLE Output" at 0.0988 / 1000.06 Hz (1 underrun at stream start). VB-CABLE exposes two playback sides ("CABLE Input", "CABLE In 16ch"), and both are recognised as feeding CABLE Output for feedback protection.
 
 ## Virtual driver (static only)
 - Built with WDK 10.0.28000 / VS 18, warnings as errors: `dbdeckvad.sys`, `.inf`, `.cat` (test-signed).

@@ -80,9 +80,9 @@ std::optional<RoutingIssue> validateRouting(const ProfileConfig& profile, const 
 
     for (auto& c : profile.channels) {
         if (c.deviceId.empty()) continue;
-        // The playback endpoint this input hears, if any.
-        std::string heard;
-        if (c.type == ChannelType::EndpointLoopback) heard = c.deviceId;
+        // The playback endpoints this input hears, if any.
+        std::vector<std::string> heard;
+        if (c.type == ChannelType::EndpointLoopback) heard.push_back(c.deviceId);
         else if (c.type == ChannelType::HardwareInput)
             if (auto it = pairs.find(c.deviceId); it != pairs.end()) heard = it->second;
         if (heard.empty()) continue;
@@ -92,9 +92,10 @@ std::optional<RoutingIssue> validateRouting(const ProfileConfig& profile, const 
         for (auto& id : reachableBuses(profile, direct)) {
             const BusConfig* b = profile.findBus(id);
             if (!b) continue;
-            const bool hits = b->deviceId == heard ||
-                              std::find(b->fallbackDeviceIds.begin(), b->fallbackDeviceIds.end(), heard) !=
-                                  b->fallbackDeviceIds.end();
+            const bool hits = std::any_of(heard.begin(), heard.end(), [&](const std::string& h) {
+                return b->deviceId == h ||
+                       std::find(b->fallbackDeviceIds.begin(), b->fallbackDeviceIds.end(), h) != b->fallbackDeviceIds.end();
+            });
             if (hits)
                 return RoutingIssue{"feedback", "Feedback loop: '" + c.name + "' hears the device that bus '" +
                                                     b->name + "' plays to"};

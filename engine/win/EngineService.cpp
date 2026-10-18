@@ -829,7 +829,7 @@ json EngineService::busRuntimeJson(const BusConfig& b) {
     bool fallback = false;
     const std::string dev = resolveBusDevice(b, &fallback);
     std::string status;
-    if (b.deviceId.empty() && b.fallbackDeviceIds.empty()) status = "no-destination";
+    if (b.deviceId.empty() && b.deviceName.empty() && b.fallbackDeviceIds.empty()) status = "no-destination";
     else if (dev.empty()) status = "disconnected";
     else if (!audio_->running(dev)) status = "error";
     else status = fallback ? "fallback" : "connected";
@@ -887,8 +887,8 @@ json EngineService::windowsVolumeJson() const {
 
 CablePairs EngineService::cablePairs() const {
     // A loopback cable is an adapter named as a cable (dB-Deck's driver,
-    // "VB-Audio Virtual Cable", "Virtual Audio Cable", ...) exposing exactly
-    // one playback and one recording endpoint. Other virtual devices
+    // "VB-Audio Virtual Cable", "Virtual Audio Cable", ...) exposing one
+    // recording endpoint and one or more playback endpoints that feed it. Other virtual devices
     // (Voicemeeter, NVIDIA Broadcast, Voicemod) process audio rather than
     // echo it, so they are not paired.
     std::map<std::string, std::pair<std::vector<const DeviceInfo*>, std::vector<const DeviceInfo*>>> byAdapter;
@@ -900,7 +900,8 @@ CablePairs EngineService::cablePairs() const {
     }
     CablePairs pairs;
     for (auto& [adapter, rc] : byAdapter)
-        if (rc.first.size() == 1 && rc.second.size() == 1) pairs[rc.second[0]->id] = rc.first[0]->id;
+        if (!rc.first.empty() && rc.second.size() == 1)
+            for (auto* r : rc.first) pairs[rc.second[0]->id].push_back(r->id);
     return pairs;
 }
 
@@ -924,7 +925,8 @@ json EngineService::driverStateJson() const {
             {"endpoints", own},
             {"cablePairs", [&] {
                  json a = json::array();
-                 for (auto& [cap, ren] : cablePairs()) a.push_back({{"recording", cap}, {"playback", ren}});
+                 for (auto& [cap, rens] : cablePairs())
+                     for (auto& ren : rens) a.push_back({{"recording", cap}, {"playback", ren}});
                  return a;
              }()},
             {"thirdPartyVirtualEndpoints", third}};

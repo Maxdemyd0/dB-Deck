@@ -574,8 +574,10 @@ TEST("win: virtual cable carries real PCM from its playback side to its recordin
         (d.render ? byAdapter[d.adapterName].first : byAdapter[d.adapterName].second).push_back(&d);
     }
     for (auto& [adapter, rc] : byAdapter)
-        if (rc.first.size() == 1 && rc.second.size() == 1 && (!in || adapter.rfind("dB-Deck", 0) == 0)) {
+        if (!rc.first.empty() && rc.second.size() == 1 && (!in || adapter.rfind("dB-Deck", 0) == 0)) {
             in = rc.first[0];
+            for (auto* r : rc.first)  // prefer the stereo side (VB-CABLE also has "CABLE In 16ch")
+                if (r->name.find("16ch") == std::string::npos) in = r;
             out = rc.second[0];
         }
     if (!in || !out) {

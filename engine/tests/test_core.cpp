@@ -354,7 +354,7 @@ TEST("routing: recording side of a virtual cable routed into its playback side i
     c.sends[0].busId = "bus0";
     p.channels.push_back(c);
     CHECK(!validateRouting(p).has_value());  // unknown pairing: allowed
-    CablePairs pairs{{"{cable-out}", "{cable-in}"}};
+    CablePairs pairs{{"{cable-out}", {"{cable-16ch}", "{cable-in}"}}};
     auto issue = validateRouting(p, pairs);
     CHECK(issue && issue->code == "feedback");
     p.channels[0].sends[0].busId = "main";  // Main plays elsewhere: fine

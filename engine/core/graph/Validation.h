@@ -24,9 +24,10 @@ BusOrder orderBuses(const ProfileConfig& profile);
 // Buses reachable from `busIds` through enabled bus-to-bus sends (inclusive).
 std::vector<std::string> reachableBuses(const ProfileConfig& profile, const std::vector<std::string>& busIds);
 
-// Recording endpoint ID -> the playback endpoint it echoes (virtual cables:
-// whatever plays into the playback side comes out of the recording side).
-using CablePairs = std::map<std::string, std::string>;
+// Recording endpoint ID -> the playback endpoints it echoes (virtual cables:
+// whatever plays into a playback side comes out of the recording side; e.g.
+// VB-CABLE has "CABLE Input" and "CABLE In 16ch" feeding "CABLE Output").
+using CablePairs = std::map<std::string, std::vector<std::string>>;
 
 // Rejects configurations that would create a routing cycle, or a feedback
 // loop: an input that hears a playback endpoint (loopback of that endpoint,
