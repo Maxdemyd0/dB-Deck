@@ -1,5 +1,7 @@
 #include "config/ConfigStore.h"
 
+#include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <fstream>
 #include <sstream>
@@ -70,8 +72,66 @@ bool ConfigStore::writeFileAtomic(const fs::path& path, const std::string& data,
 #endif
 }
 
+fs::path ConfigStore::finalPath(const fs::path& p) {
+#ifdef _WIN32
+    HANDLE h = CreateFileW(p.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING,
+                           FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+    if (h == INVALID_HANDLE_VALUE) return {};
+    std::wstring buf(1024, L'\0');
+    DWORD n = GetFinalPathNameByHandleW(h, buf.data(), static_cast<DWORD>(buf.size()), VOLUME_NAME_DOS);
+    if (n >= buf.size()) {
+        buf.resize(n + 1);
+        n = GetFinalPathNameByHandleW(h, buf.data(), static_cast<DWORD>(buf.size()), VOLUME_NAME_DOS);
+    }
+    CloseHandle(h);
+    if (n == 0 || n >= buf.size()) return {};
+    buf.resize(n);
+    return buf;
+#else
+    std::error_code ec;
+    fs::path r = fs::canonical(p, ec);
+    return ec ? fs::path() : r;
+#endif
+}
+
+bool ConfigStore::samePath(const fs::path& a, const fs::path& b) {
+    auto norm = [](const fs::path& p) {
+        std::wstring s = p.lexically_normal().wstring();
+        if (s.rfind(LR"(\\?\UNC\)", 0) == 0) s = LR"(\\)" + s.substr(8);
+        else if (s.rfind(LR"(\\?\)", 0) == 0) s = s.substr(4);
+#ifdef _WIN32
+        std::transform(s.begin(), s.end(), s.begin(), [](wchar_t ch) { return static_cast<wchar_t>(towlower(ch)); });
+        while (s.size() > 3 && (s.back() == L'\\' || s.back() == L'/')) s.pop_back();
+#endif
+        return s;
+    };
+    return norm(a) == norm(b);
+}
+
+// The folder is compared through the same resolver as the file, so short
+// (8.3) names, junctions and subst drives do not count as redirection; only
+// a file stored somewhere other than next to its folder does.
+fs::path ConfigStore::redirection() const {
+    const fs::path dir = resolve_(dir_);
+    if (dir.empty()) return {};
+    for (const fs::path& p : {mainPath(), backupPath()}) {
+        std::error_code ec;
+        if (!fs::exists(p, ec)) continue;
+        const fs::path real = resolve_(p);
+        if (!real.empty() && !samePath(real, dir / p.filename())) return real;
+    }
+    return {};
+}
+
 ConfigLoadResult ConfigStore::load() {
     ConfigLoadResult r;
+    r.redirectedTo = redirection();
+    if (!r.redirectedTo.empty()) {
+        const std::u8string where = r.redirectedTo.u8string();
+        r.warnings.push_back("Windows is redirecting the settings file to " + std::string(where.begin(), where.end()) +
+                             " because dB-Deck was started from inside another app's package. These are not the "
+                             "settings dB-Deck uses when started normally; restart it from the Start menu.");
+    }
     auto tryParse = [&](const fs::path& p, AppConfig& out, std::string& err) -> bool {
         std::string text;
         if (!readFile(p, text)) {

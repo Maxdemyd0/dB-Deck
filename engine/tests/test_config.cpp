@@ -138,3 +138,41 @@ TEST("config store: missing file creates defaults") {
     CHECK(r.createdDefault);
     CHECK(r.config.activeProfile() != nullptr);
 }
+
+TEST("config store: a normal folder is not reported as redirected") {
+    ConfigStore store(tempDir("direct"));
+    std::string err;
+    CHECK(store.save(sampleConfig(), err));
+    ConfigLoadResult r = store.load();
+    CHECK(r.redirectedTo.empty());
+    CHECK(r.warnings.empty());
+}
+
+TEST("config store: settings redirected by Windows (packaged-app AppData) are reported") {
+    // A process started from inside an MSIX app sees that app's private
+    // LocalCache\Roaming copy laid over %APPDATA%: the folder resolves to the
+    // real place while the file resolves into the package.
+    ConfigStore store(tempDir("redirected"));
+    std::string err;
+    CHECK(store.save(sampleConfig(), err));
+    const fs::path virt = fs::path("C:/Users/x/AppData/Local/Packages/Some.App_123/LocalCache/Roaming/dB-Deck");
+    store.setPathResolver([&](const fs::path& p) {
+        if (p == store.directory()) return store.directory();
+        return virt / p.filename();
+    });
+    ConfigLoadResult r = store.load();
+    CHECK(ConfigStore::samePath(r.redirectedTo, virt / "config.json"));
+    CHECK(!r.warnings.empty());
+    CHECK(r.warnings[0].find("LocalCache") != std::string::npos);
+    CHECK(!r.createdDefault);
+    CHECK(r.config.profiles[0].channels.size() == 1);  // still loads what this process can see
+}
+
+#ifdef _WIN32
+TEST("config store: path comparison ignores the long-path prefix, case and trailing separators") {
+    CHECK(ConfigStore::samePath(R"(\\?\C:\Users\X\dB-Deck\config.json)", R"(c:\users\x\db-deck\config.json)"));
+    CHECK(ConfigStore::samePath(R"(\\?\UNC\srv\share\a)", R"(\\srv\share\a\)"));
+    CHECK(!ConfigStore::samePath(R"(C:\Users\x\AppData\Roaming\dB-Deck\config.json)",
+                                 R"(C:\Users\x\AppData\Local\Packages\P\LocalCache\Roaming\dB-Deck\config.json)"));
+}
+#endif
