@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ReactNode, RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { dismissToast, useToasts } from "../engine/store";
 import { Icon } from "./Icon";
 
@@ -32,10 +32,36 @@ export interface MenuItem {
   separator?: boolean;
   heading?: boolean;
   checked?: boolean;
+  /** Color square shown before the label (strip color picker). */
+  swatch?: string;
 }
 
-/** Popup menu anchored to a button. */
-export function MenuButton({ items, label = "More", icon = "more", className = "btn ghost icon small" }: { items: MenuItem[]; label?: string; icon?: string; className?: string }) {
+/** Strip colors offered in channel and bus menus. */
+export const STRIP_COLORS: { name: string; value: string }[] = [
+  { name: "Red", value: "#ef4444" },
+  { name: "Orange", value: "#f97316" },
+  { name: "Yellow", value: "#eab308" },
+  { name: "Green", value: "#22c55e" },
+  { name: "Teal", value: "#14b8a6" },
+  { name: "Blue", value: "#3b82f6" },
+  { name: "Purple", value: "#a855f7" },
+  { name: "Pink", value: "#ec4899" },
+];
+
+/** Menu items for choosing a strip color. */
+export function colorMenuItems(current: string | undefined, set: (color: string) => void): MenuItem[] {
+  return [
+    { heading: true, label: "Color" },
+    { label: "None", checked: !current, onClick: () => set("") },
+    ...STRIP_COLORS.map((c) => ({ label: c.name, swatch: c.value, checked: current === c.value, onClick: () => set(c.value) })),
+  ];
+}
+
+/**
+ * Popup menu anchored to a button. With `contextTarget`, right-clicking that
+ * element opens the same menu at the pointer.
+ */
+export function MenuButton({ items, label = "More", icon = "more", className = "btn ghost icon small", contextTarget }: { items: MenuItem[]; label?: string; icon?: string; className?: string; contextTarget?: RefObject<HTMLElement | null> }) {
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const btn = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
@@ -56,6 +82,17 @@ export function MenuButton({ items, label = "More", icon = "more", className = "
       window.removeEventListener("keydown", key);
     };
   }, [pos]);
+  useEffect(() => {
+    const el = contextTarget?.current;
+    if (!el) return;
+    const open = (e: MouseEvent) => {
+      if ((e.target as HTMLElement).closest("input, textarea")) return;
+      e.preventDefault();
+      setPos({ x: e.clientX, y: e.clientY });
+    };
+    el.addEventListener("contextmenu", open);
+    return () => el.removeEventListener("contextmenu", open);
+  }, [contextTarget]);
   return (
     <>
       <button
@@ -91,6 +128,7 @@ export function MenuButton({ items, label = "More", icon = "more", className = "
                 }}
               >
                 <span style={{ width: 14, display: "inline-flex" }}>{it.checked && <Icon name="check" size={14} />}</span>
+                {it.swatch && <span className="swatch" style={{ background: it.swatch }} />}
                 {it.label}
               </button>
             ),

@@ -66,6 +66,7 @@ struct ChannelConfig {
     std::vector<SendConfig> sends;
     std::vector<EffectConfig> effects;
     std::string reconnect = "auto";  // "auto" | "manual"
+    std::string color;               // strip color "#rrggbb" ("" = none; display only)
 
     const SendConfig* findSend(const std::string& busId) const;
     SendConfig* findSend(const std::string& busId);
@@ -90,6 +91,7 @@ struct BusConfig {
     std::vector<std::string> fallbackDeviceIds;  // explicit, user-authorised fallbacks in order
     std::vector<SendConfig> busSends;            // this bus feeds other buses
     std::vector<EffectConfig> effects;
+    std::string color;  // strip color "#rrggbb" ("" = none; display only)
 };
 
 struct SceneChannelState {
@@ -143,6 +145,9 @@ struct AppConfig {
     ProfileConfig* findProfile(const std::string& id);
     ProfileConfig* activeProfile();
 };
+
+// True for "" or a "#rrggbb" color.
+bool isValidColor(const std::string& s);
 
 // Builders for defaults.
 std::string newId();

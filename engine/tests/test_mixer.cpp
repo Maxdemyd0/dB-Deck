@@ -283,3 +283,35 @@ TEST("scenes: capture and apply restore levels, mutes and sends") {
     CHECK(!p.channels[0].mute);
     CHECK_NEAR(p.channels[0].sends[0].gain, 1.0, 1e-6);
 }
+
+TEST("mixer: solo silences other channels on Main only, never other buses") {
+    Rig r;
+    r.addTone("mic", 500, 0.4f);
+    r.addTone("game", 1500, 0.4f);
+    r.profile.findChannel("mic")->sends.push_back({"stream", true, 1.0f, false});
+    r.profile.findChannel("game")->sends.push_back({"stream", true, 1.0f, false});
+    r.compile();
+    r.reg.solo.insert("game");
+    r.reg.applyParams(r.profile);  // no rebuild needed
+    std::vector<float> stream;
+    auto main = r.run(200, &stream);
+    CHECK(testsig::toneAmplitude(main, 0, 48000, 500) < 0.001);           // mic cut on Main
+    CHECK_NEAR(testsig::toneAmplitude(main, 0, 48000, 1500), 0.4, 0.01);  // soloed channel stays
+    CHECK_NEAR(testsig::toneAmplitude(stream, 0, 48000, 500), 0.4, 0.01); // virtual mic untouched
+    CHECK_NEAR(testsig::toneAmplitude(stream, 0, 48000, 1500), 0.4, 0.01);
+    r.reg.solo.clear();
+    r.reg.applyParams(r.profile);
+    CHECK_NEAR(testsig::toneAmplitude(r.run(200), 0, 48000, 500), 0.4, 0.01);
+}
+
+TEST("mixer: solo of a removed channel is dropped") {
+    Rig r;
+    r.addTone("a", 500, 0.4f);
+    r.addTone("b", 900, 0.4f);
+    r.compile();
+    r.reg.solo.insert("b");
+    std::erase_if(r.profile.channels, [](const ChannelConfig& c) { return c.id == "b"; });
+    r.compile();  // prunes
+    CHECK(r.reg.solo.empty());
+    CHECK_NEAR(testsig::toneAmplitude(r.run(100), 0, 48000, 500), 0.4, 0.01);
+}

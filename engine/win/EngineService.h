@@ -78,6 +78,8 @@ private:
     void reconcileOutputs();
     void compile();
     void applySessionVolumes();
+    // Pushes continuous parameters (gains, sends, effects, session volumes) without a rebuild.
+    void applyLiveParams();
     void adoptExternalSessionChanges();
     void refreshDevices();
     void adoptDevicesByName();

@@ -79,6 +79,27 @@ TEST("config: invalid documents are rejected with a path") {
     CHECK_THROWS(configFromJson(j3));
 }
 
+TEST("config: strip colors round trip; old configs and bad colors load without one") {
+    AppConfig c = sampleConfig();
+    c.profiles[0].channels[0].color = "#ff8800";
+    c.profiles[0].buses[1].color = "#00AAFF";
+    AppConfig back = configFromJson(json::parse(toJson(c).dump()));
+    CHECK(back.profiles[0].channels[0].color == "#ff8800");
+    CHECK(back.profiles[0].buses[1].color == "#00AAFF");
+    json old = toJson(sampleConfig());
+    old["profiles"][0]["channels"][0].erase("color");
+    old["profiles"][0]["buses"][1].erase("color");
+    AppConfig o = configFromJson(old);
+    CHECK(o.profiles[0].channels[0].color.empty());
+    json bad = toJson(sampleConfig());
+    bad["profiles"][0]["channels"][0]["color"] = "red";
+    CHECK(configFromJson(bad).profiles[0].channels[0].color.empty());
+    CHECK(isValidColor(""));
+    CHECK(isValidColor("#a1B2c3"));
+    CHECK(!isValidColor("#12345"));
+    CHECK(!isValidColor("#12345g"));
+}
+
 TEST("config: out-of-range values are clamped") {
     json j = toJson(sampleConfig());
     j["profiles"][0]["channels"][0]["volume"] = 7.5;

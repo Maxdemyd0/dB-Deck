@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { CSSProperties, useRef, useState } from "react";
 import { FADER_MAX } from "../engine/format";
 import { request } from "../engine/store";
 import type { Bus, Channel, ChannelRuntime, Device, Group } from "../engine/types";
 import { Fader } from "./Fader";
 import { Icon } from "./Icon";
 import { Meter } from "./Meter";
-import { MenuButton, MenuItem } from "./Overlay";
+import { colorMenuItems, MenuButton, MenuItem } from "./Overlay";
 import { StripValue } from "./StripValue";
 
 export type View = "simple" | "mixer" | "advanced";
@@ -33,6 +33,7 @@ interface Props {
   devices: Device[];
   icon?: string;
   view: View;
+  soloed: boolean;
   dragging: boolean;
   dropBefore: boolean;
   onDragStart: () => void;
@@ -48,6 +49,7 @@ export function ChannelStrip(p: Props) {
   const { channel: c, runtime: rt, view } = p;
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState(c.name);
+  const root = useRef<HTMLDivElement>(null);
   const managed = rt?.capability === "managed";
   // Windows session volume stops at 100%; managed audio can boost to +20 dB.
   const canBoost = c.type !== "app" || c.appCapture;
@@ -92,6 +94,8 @@ export function ChannelStrip(p: Props) {
   }
   menu.push({ label: managed ? "Effects…" : "Effects… (needs managed audio)", disabled: !managed, onClick: p.onEffects });
   menu.push({ separator: true, label: "" });
+  menu.push(...colorMenuItems(c.color, (color) => void update({ color })));
+  menu.push({ separator: true, label: "" });
   menu.push({ label: "Remove channel", danger: true, onClick: () => request("deleteChannel", { id: c.id }).catch(() => {}) });
 
   const sessionHint =
@@ -101,7 +105,9 @@ export function ChannelStrip(p: Props) {
 
   return (
     <div
-      className={`strip${offline ? " offline" : ""}${p.dragging ? " dragging" : ""}${p.dropBefore ? " drop-before" : ""}`}
+      ref={root}
+      className={`strip${offline ? " offline" : ""}${p.dragging ? " dragging" : ""}${p.dropBefore ? " drop-before" : ""}${c.color ? " colored" : ""}`}
+      style={c.color ? ({ "--strip-color": c.color } as CSSProperties) : undefined}
       onDragOver={(e) => {
         e.preventDefault();
         p.onDragOverStrip();
@@ -140,7 +146,7 @@ export function ChannelStrip(p: Props) {
             c.name
           )}
         </div>
-        <MenuButton items={menu} label={`${c.name} options`} />
+        <MenuButton items={menu} label={`${c.name} options`} contextTarget={root} />
       </div>
 
       <div className="strip-sub" title={rt?.error || status.text}>
@@ -193,6 +199,16 @@ export function ChannelStrip(p: Props) {
         <button className={`btn small mute${c.mute ? " on" : ""}`} onClick={() => update({ mute: !c.mute })} aria-pressed={c.mute} title="Mute">
           M
         </button>
+        {managed && (
+          <button
+            className={`btn small solo${p.soloed ? " on" : ""}`}
+            onClick={() => request("setSolo", { id: c.id, solo: !p.soloed }).catch(() => {})}
+            aria-pressed={p.soloed}
+            title="Solo: hear only soloed channels on Main. Virtual mics and other buses are not affected."
+          >
+            S
+          </button>
+        )}
         {view !== "simple" && managed && (
           <button className={`btn small toggle${c.effects.some((e) => e.enabled) ? " on" : ""}`} onClick={p.onEffects} title="Effects">
             FX

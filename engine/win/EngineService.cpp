@@ -676,12 +676,17 @@ json EngineService::mutate(bool undoable, bool structural, const std::function<j
         rebuildAudio();
         rebindEndpointVolumes();
     } else {
-        registry_.applyParams(live);
-        for (auto& c : live.channels)
-            if (c.type == ChannelType::App) registry_.channel(c.id)->gain.setTarget(1.0f);
-        applySessionVolumes();
+        applyLiveParams();
     }
     return result;
+}
+
+void EngineService::applyLiveParams() {
+    ProfileConfig& live = profile();
+    registry_.applyParams(live);
+    for (auto& c : live.channels)
+        if (c.type == ChannelType::App) registry_.channel(c.id)->gain.setTarget(1.0f);
+    applySessionVolumes();
 }
 
 // ---------------------------------------------------------------------------
@@ -1021,6 +1026,7 @@ json EngineService::buildState() {
               {"masterMute", mixer_.masterMuted()},
               {"warnings", warnings_},
               {"undoDepth", undo_.size()},
+              {"solo", registry_.solo},
               {"iconsVersion", iconsVersion_}}},
             {"settings",
              {{"bufferMode", config_.settings.bufferMode},
@@ -1143,7 +1149,7 @@ void EngineService::registerCommands() {
         // Continuous-parameter-only updates do not rebuild sources or streams.
         const bool structural = a.contains("appCapture") || a.contains("deviceId") || a.contains("exeNames") ||
                                 a.contains("pathContains") || a.contains("groupId") || a.contains("toneHz");
-        const bool undoable = structural || a.contains("name");
+        const bool undoable = structural || a.contains("name") || a.contains("color");
         return mutate(undoable, structural, [&](ProfileConfig& p) {
             ChannelConfig* c = p.findChannel(id);
             requireFound(c, "channel");
@@ -1187,6 +1193,10 @@ void EngineService::registerCommands() {
                 if (*v != "auto" && *v != "manual") throw ProtocolError("bad_args", "reconnect must be auto|manual");
                 c->reconnect = *v;
             }
+            if (auto v = optString(a, "color")) {
+                if (!isValidColor(*v)) throw ProtocolError("bad_args", "color must be \"#rrggbb\" or empty");
+                c->color = *v;
+            }
             return toJson(*c);
         });
     };
@@ -1206,6 +1216,39 @@ void EngineService::registerCommands() {
             p.channels = std::move(ordered);
             return json{{"ok", true}};
         });
+    };
+    h["reorderBuses"] = [this](const json& a) {
+        if (!a.contains("ids") || !a["ids"].is_array()) throw ProtocolError("bad_args", "'ids' must be an array");
+        return mutate(true, false, [&](ProfileConfig& p) {
+            std::vector<BusConfig> ordered;
+            for (auto& idj : a["ids"]) {
+                if (!idj.is_string()) throw ProtocolError("bad_args", "ids must be strings");
+                auto it = std::find_if(p.buses.begin(), p.buses.end(),
+                                       [&](const BusConfig& b) { return b.id == idj.get<std::string>(); });
+                if (it == p.buses.end()) continue;
+                ordered.push_back(std::move(*it));
+                p.buses.erase(it);
+            }
+            for (auto& rest : p.buses) ordered.push_back(std::move(rest));
+            // Main always stays first.
+            std::stable_partition(ordered.begin(), ordered.end(), [](const BusConfig& b) { return b.isMain; });
+            p.buses = std::move(ordered);
+            return json{{"ok", true}};
+        });
+    };
+    h["setSolo"] = [this](const json& a) {
+        // Monitoring aid: not saved, not undoable.
+        if (a.contains("clear") && a["clear"].is_boolean() && a["clear"].get<bool>()) {
+            registry_.solo.clear();
+        } else {
+            const std::string id = argString(a, "id");
+            requireFound(profile().findChannel(id), "channel");
+            if (optBool(a, "solo").value_or(true)) registry_.solo.insert(id);
+            else registry_.solo.erase(id);
+        }
+        applyLiveParams();
+        markStateDirty();
+        return json{{"solo", registry_.solo}};
     };
     h["setSend"] = [this](const json& a) {
         const std::string cid = argString(a, "channelId"), bid = argString(a, "busId");
@@ -1281,10 +1324,17 @@ void EngineService::registerCommands() {
     h["updateBus"] = [this](const json& a) {
         const std::string id = argString(a, "id");
         const bool structural = a.contains("deviceId") || a.contains("fallbackDeviceIds");
-        return mutate(structural || a.contains("name"), structural, [&](ProfileConfig& p) {
+        return mutate(structural || a.contains("name") || a.contains("color"), structural, [&](ProfileConfig& p) {
             BusConfig* b = p.findBus(id);
             requireFound(b, "bus");
-            if (auto v = optString(a, "name")) b->name = *v;
+            if (auto v = optString(a, "name")) {
+                if (v->empty()) throw ProtocolError("bad_args", "name cannot be empty");
+                b->name = *v;
+            }
+            if (auto v = optString(a, "color")) {
+                if (!isValidColor(*v)) throw ProtocolError("bad_args", "color must be \"#rrggbb\" or empty");
+                b->color = *v;
+            }
             if (auto v = optFloat(a, "volume", 0, kFaderMax)) b->volume = *v;
             if (auto v = optBool(a, "mute")) b->mute = *v;
             if (auto v = optString(a, "deviceId")) {

@@ -1,11 +1,11 @@
-import { useMemo, useState } from "react";
+import { ReactNode, useMemo, useRef, useState } from "react";
 import { BusStrip } from "../components/BusStrip";
 import { ChannelStrip, View } from "../components/ChannelStrip";
 import { EffectsEditor } from "../components/EffectsEditor";
 import { Fader } from "../components/Fader";
 import { StripValue } from "../components/StripValue";
 import { Icon } from "../components/Icon";
-import { MenuButton, Modal, Prompt } from "../components/Overlay";
+import { MenuButton, MenuItem, Modal, Prompt } from "../components/Overlay";
 import { request } from "../engine/store";
 import type { Channel, EngineState } from "../engine/types";
 import { AvailableApps } from "./AvailableApps";
@@ -19,6 +19,18 @@ export function MixerPage({ state, view, icons, appsOpen, searchRef }: { state: 
   const [newGroupFor, setNewGroupFor] = useState<string | null | undefined>(undefined);
   const [addOpen, setAddOpen] = useState(false);
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
+  const [busDragId, setBusDragId] = useState<string | null>(null);
+  const [busDropBefore, setBusDropBefore] = useState<string | null>(null);
+
+  const dropBus = (beforeId: string) => {
+    if (!busDragId) return;
+    const ids = p.buses.map((b) => b.id).filter((id) => id !== busDragId);
+    const idx = ids.indexOf(beforeId);
+    ids.splice(idx < 0 ? ids.length : idx, 0, busDragId);
+    void request("reorderBuses", { ids }).catch(() => {});
+    setBusDragId(null);
+    setBusDropBefore(null);
+  };
 
   const visibleBuses = p.buses;
   const ungrouped = p.channels.filter((c) => !c.groupId || !p.groups.some((g) => g.id === c.groupId));
@@ -53,6 +65,7 @@ export function MixerPage({ state, view, icons, appsOpen, searchRef }: { state: 
         devices={state.devices}
         icon={rt?.iconKey ? icons[rt.iconKey] : undefined}
         view={view}
+        soloed={!!state.engine.solo?.includes(c.id)}
         dragging={dragId === c.id}
         dropBefore={dropTarget === c.id && dragId !== c.id}
         onDragStart={() => setDragId(c.id)}
@@ -118,20 +131,19 @@ export function MixerPage({ state, view, icons, appsOpen, searchRef }: { state: 
                       if ((e.target as HTMLElement).closest(".strip") === null) drop(null, g.id);
                     }}
                   >
-                    <div className="group-head">
+                    <GroupHead
+                      menuLabel={`${g.name} options`}
+                      menu={[
+                        { label: "Rename", onClick: () => setRenaming({ id: g.id, name: g.name }) },
+                        { label: "Delete group (keeps channels)", danger: true, onClick: () => request("deleteGroup", { id: g.id }).catch(() => {}) },
+                      ]}
+                    >
                       <button className="btn ghost icon small" onClick={() => request("updateGroup", { id: g.id, collapsed: !g.collapsed }).catch(() => {})} aria-label={g.collapsed ? "Expand group" : "Collapse group"}>
                         <Icon name={g.collapsed ? "expand" : "collapse"} size={14} />
                       </button>
                       <span className="name grow">{g.name}</span>
                       <span className="faint small">{members.length}</span>
-                      <MenuButton
-                        label={`${g.name} options`}
-                        items={[
-                          { label: "Rename", onClick: () => setRenaming({ id: g.id, name: g.name }) },
-                          { label: "Delete group (keeps channels)", danger: true, onClick: () => request("deleteGroup", { id: g.id }).catch(() => {}) },
-                        ]}
-                      />
-                    </div>
+                    </GroupHead>
                     <div className="group-body">
                       <div className={`strip${g.mute ? " offline" : ""}`} style={{ width: 84 }} title="Group fader scales every member channel">
                         <div className="strip-sub"><Icon name="group" size={12} /> Group</div>
@@ -170,7 +182,21 @@ export function MixerPage({ state, view, icons, appsOpen, searchRef }: { state: 
             </div>
             <div className="strips">
               {p.buses.map((b) => (
-                <BusStrip key={b.id} bus={b} runtime={state.runtime.buses[b.id]} devices={state.devices} onEffects={() => setFx({ target: "bus", id: b.id })} />
+                <BusStrip
+                  key={b.id}
+                  bus={b}
+                  runtime={state.runtime.buses[b.id]}
+                  devices={state.devices}
+                  onEffects={() => setFx({ target: "bus", id: b.id })}
+                  drag={{
+                    dragging: busDragId === b.id,
+                    dropBefore: busDropBefore === b.id && busDragId !== b.id,
+                    onDragStart: () => setBusDragId(b.id),
+                    onDragEnd: () => (setBusDragId(null), setBusDropBefore(null)),
+                    onDragOverStrip: () => busDragId && setBusDropBefore(b.id),
+                    onDropStrip: () => dropBus(b.id),
+                  }}
+                />
               ))}
             </div>
           </>
@@ -275,5 +301,16 @@ function AddChannel({ state, onClose }: { state: EngineState; onClose: () => voi
         </div>
       </div>
     </Modal>
+  );
+}
+
+/** Group header: the "…" menu also opens on right-click anywhere in the header. */
+function GroupHead({ menu, menuLabel, children }: { menu: MenuItem[]; menuLabel: string; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  return (
+    <div className="group-head" ref={ref}>
+      {children}
+      <MenuButton label={menuLabel} items={menu} contextTarget={ref} />
+    </div>
   );
 }

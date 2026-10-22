@@ -66,6 +66,7 @@ select { padding-right: 24px; }
 .btn.icon.small { width: 24px; }
 .btn.toggle.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 .btn.mute.on { background: var(--mute); border-color: var(--mute); color: #2a0703; font-weight: 700; }
+.btn.solo.on { background: #facc15; border-color: #facc15; color: #2a2003; font-weight: 700; }
 
 .seg { display: inline-flex; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-s); padding: 2px; }
 .seg button { border: 0; background: none; padding: 4px 11px; border-radius: 4px; color: var(--text-2); cursor: pointer; }
@@ -128,6 +129,8 @@ kbd { font: 11px var(--font-mono); padding: 1px 6px; border-radius: 4px; backgro
 .strip.dragging { opacity: 0.35; }
 .strip.drop-before::before { content: ""; position: absolute; left: -7px; top: 8px; bottom: 8px; width: 3px; border-radius: 3px; background: var(--accent); }
 .strip.bus { background: linear-gradient(var(--surface-2), var(--surface-1)); }
+.strip.colored { box-shadow: inset 0 3px 0 var(--strip-color); }
+.strip.colored .strip-icon { color: var(--strip-color); }
 .strip.bus.main { border-color: rgba(34, 199, 214, 0.45); }
 .strip-head { display: flex; align-items: center; gap: 6px; min-height: 30px; cursor: grab; }
 .strip-head:active { cursor: grabbing; }
@@ -228,6 +231,7 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .menu button:hover:not(:disabled) { background: var(--surface-4); }
 .menu button:disabled { opacity: 0.45; cursor: default; }
 .menu button.danger { color: var(--danger); }
+.menu .swatch { width: 12px; height: 12px; border-radius: 3px; flex: none; }
 .menu hr { border: 0; border-top: 1px solid var(--border); margin: 4px 2px; }
 .menu .menu-label { padding: 6px 9px 3px; font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; }
 .toasts { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 70; max-width: 420px; }

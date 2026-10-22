@@ -211,6 +211,15 @@ function Toolbar({ state, connected, view, setView }: { state: EngineState | nul
         </>
       )}
       <div className="spacer" />
+      {state && (state.engine.solo?.length ?? 0) > 0 && (
+        <button
+          className="btn small solo on"
+          onClick={() => request("setSolo", { clear: true }).catch(() => {})}
+          title="Channels are soloed on Main. Click to clear solo."
+        >
+          Solo ({state.engine.solo!.length}) ✕
+        </button>
+      )}
       {state && <WindowsVolume ep={state.windowsVolume.default} target="default" compact={view === "simple"} />}
       {state && (
         <button

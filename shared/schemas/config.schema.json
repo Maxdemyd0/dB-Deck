@@ -64,7 +64,8 @@
         "groupId": { "type": "string" },
         "sends": { "type": "array", "items": { "$ref": "#/$defs/send" } },
         "effects": { "type": "array", "items": { "$ref": "#/$defs/effect" } },
-        "reconnect": { "enum": ["auto", "manual"] }
+        "reconnect": { "enum": ["auto", "manual"] },
+        "color": { "type": "string", "pattern": "^(#[0-9a-fA-F]{6})?$", "description": "strip color; empty = none" }
       }
     },
     "group": {
@@ -91,7 +92,8 @@
         "deviceName": { "type": "string" },
         "fallbackDeviceIds": { "type": "array", "items": { "type": "string" } },
         "busSends": { "type": "array", "items": { "$ref": "#/$defs/send" } },
-        "effects": { "type": "array", "items": { "$ref": "#/$defs/effect" } }
+        "effects": { "type": "array", "items": { "$ref": "#/$defs/effect" } },
+        "color": { "type": "string", "pattern": "^(#[0-9a-fA-F]{6})?$", "description": "strip color; empty = none" }
       }
     },
     "profile": {

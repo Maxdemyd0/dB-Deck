@@ -66,11 +66,16 @@ static void applyEffects(RuntimeRegistry& reg, const std::vector<EffectConfig>& 
 }
 
 void RuntimeRegistry::applyParams(const ProfileConfig& profile) {
+    const BusConfig* main = profile.mainBus();
     for (auto& c : profile.channels) {
         auto rt = channel(c.id);
         rt->gain.setTarget(channelGain(profile, c));
         rt->balance.setTarget(c.balance);
-        for (auto& s : c.sends) send(c.id, s.busId)->gain.setTarget(s.enabled ? s.gain : 0.0f);
+        const bool soloedOut = !solo.empty() && !solo.count(c.id);
+        for (auto& s : c.sends) {
+            const bool cut = soloedOut && main && s.busId == main->id;
+            send(c.id, s.busId)->gain.setTarget(s.enabled && !cut ? s.gain : 0.0f);
+        }
         applyEffects(*this, c.effects);
     }
     for (auto& b : profile.buses) {
@@ -98,6 +103,7 @@ void RuntimeRegistry::prune(const ProfileConfig& profile) {
     std::erase_if(buses_, [&](auto& kv) { return !bu.count(kv.first); });
     std::erase_if(sends_, [&](auto& kv) { return !se.count(kv.first); });
     std::erase_if(effects_, [&](auto& kv) { return !fx.count(kv.first); });
+    std::erase_if(solo, [&](const std::string& id) { return !ch.count(id); });
 }
 
 std::unique_ptr<CompiledGraph> compileGraph(const ProfileConfig& profile, RuntimeRegistry& reg,

@@ -35,6 +35,8 @@ export interface Channel {
   sends: Send[];
   effects: Effect[];
   reconnect: "auto" | "manual";
+  /** Strip color "#rrggbb", or "" for none. */
+  color?: string;
 }
 
 export interface Group {
@@ -56,6 +58,8 @@ export interface Bus {
   fallbackDeviceIds: string[];
   busSends: Send[];
   effects: Effect[];
+  /** Strip color "#rrggbb", or "" for none. */
+  color?: string;
 }
 
 export interface Scene {
@@ -163,6 +167,8 @@ export interface EngineState {
     masterMute: boolean;
     warnings: string[];
     undoDepth: number;
+    /** Soloed channel IDs (runtime only). */
+    solo?: string[];
     iconsVersion: number;
   };
   settings: { bufferMode: "low" | "normal" | "safe"; meterRateHz: number; showSystemSounds: boolean };

@@ -31,6 +31,14 @@ std::optional<ChannelType> channelTypeFromString(const std::string& s) {
     return std::nullopt;
 }
 
+bool isValidColor(const std::string& s) {
+    if (s.empty()) return true;
+    if (s.size() != 7 || s[0] != '#') return false;
+    for (size_t i = 1; i < 7; ++i)
+        if (!std::isxdigit(static_cast<unsigned char>(s[i]))) return false;
+    return true;
+}
+
 std::string newId() {
     thread_local std::mt19937_64 rng{std::random_device{}() ^ (static_cast<uint64_t>(std::random_device{}()) << 32)};
     uint64_t a = rng(), b = rng();
@@ -157,7 +165,8 @@ json toJson(const ChannelConfig& c) {
             {"groupId", c.groupId},
             {"sends", sendsToJson(c.sends)},
             {"effects", effectsToJson(c.effects)},
-            {"reconnect", c.reconnect}};
+            {"reconnect", c.reconnect},
+            {"color", c.color}};
 }
 
 json toJson(const GroupConfig& g) {
@@ -174,7 +183,8 @@ json toJson(const BusConfig& b) {
             {"deviceName", b.deviceName},
             {"fallbackDeviceIds", b.fallbackDeviceIds},
             {"busSends", sendsToJson(b.busSends)},
-            {"effects", effectsToJson(b.effects)}};
+            {"effects", effectsToJson(b.effects)},
+            {"color", b.color}};
 }
 
 json toJson(const SceneConfig& s) {
@@ -342,6 +352,8 @@ ChannelConfig channelFromJson(const json& j, const std::string& path) {
     c.effects = effectsFromJson(j, path);
     c.reconnect = getString(j, "reconnect", path, "auto");
     if (c.reconnect != "auto" && c.reconnect != "manual") c.reconnect = "auto";
+    c.color = getString(j, "color", path, "");
+    if (!isValidColor(c.color)) c.color.clear();
     return c;
 }
 
@@ -412,6 +424,8 @@ ProfileConfig profileFromJson(const json& j, const std::string& path) {
                     if (f.is_string()) bc.fallbackDeviceIds.push_back(f.get<std::string>());
             bc.busSends = sendsFromJson(b, "busSends", bp);
             bc.effects = effectsFromJson(b, bp);
+            bc.color = getString(b, "color", bp, "");
+            if (!isValidColor(bc.color)) bc.color.clear();
             p.buses.push_back(std::move(bc));
         }
     if (const json* arr = getArray(j, "scenes", path))

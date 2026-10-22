@@ -10,6 +10,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -33,6 +34,11 @@ public:
     ChannelRuntime* findChannel(const std::string& id) const;
     BusRuntime* findBus(const std::string& id) const;
     Effect* findEffect(const std::string& id) const;
+
+    // Soloed channel IDs (runtime only, never saved). While any channel is
+    // soloed, other channels' sends to the Main bus are silenced; sends to
+    // every other bus (virtual mics, recordings) are left alone.
+    std::set<std::string> solo;
 
 private:
     std::map<std::string, std::shared_ptr<ChannelRuntime>> channels_;
