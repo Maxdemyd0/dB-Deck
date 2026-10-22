@@ -23,12 +23,15 @@ No account. No subscription. No telemetry.
 - **Choose each app's output device**, the same as the Windows Volume Mixer setting, from the app's channel menu.
 - **Unlimited channels and buses.** Send any input to any number of buses, each at its own level (pre- or post-fader), and chain buses into each other.
 - **Real audio engine.** A native C++ engine (WASAPI, 48 kHz, 32-bit float) captures microphones, playback devices and individual apps, and mixes them with low latency.
-- **Faders up to +20 dB**, plus mute, balance, groups and live meters.
+- **Faders up to +20 dB**, plus mute, solo, balance, groups and live meters. Click any level to type an exact value, scroll in 1 dB steps (Ctrl for 0.1 dB), and clip lights stay lit until you clear them.
+- **Global hotkeys.** Mute your mic, hold-to-mute, nudge a volume, switch scenes or profiles, even in a game or with dB-Deck in the tray.
+- **Undo and redo** for every mixer change, including fader moves. Deleting something shows an Undo button.
+- **Your layout, your way.** Rename, color and reorder channels and buses; right-click any strip for its menu.
 - **Effects.** EQ, noise gate, compressor, limiter and gain, applied to the actual audio.
 - **Main output stays where you put it.** It plays on the device you choose, independent of the Windows default, reconnects automatically, and only falls back to devices you approve.
 - **Windows volume sync.** The toolbar's Windows volume follows Quick Settings and your keyboard volume keys, and moving it changes Windows' volume too.
 - **Profiles and scenes.** Switch whole setups, or swap levels instantly.
-- **Import from Voicemeeter.** Turns your Voicemeeter Standard, Banana or Potato settings into a dB-Deck profile.
+- **Import from Voicemeeter.** Turns your Voicemeeter Standard, Banana or Potato settings into a dB-Deck profile. If Voicemeeter is still running and holding a device, dB-Deck tells you and can close it for you.
 - **Runs in the tray.** Closing the window keeps audio running. It can start with Windows.
 - **Safe by design.** It rejects routing loops and feedback, and never plays a captured app twice on the same device.
 

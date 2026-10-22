@@ -40,6 +40,16 @@ Environment variables: `DBDECK_TEST_RENDER_DEVICE` (substring of the device name
 - Engine on this machine: `driver.installed = false`, no false cable pairs among 20 third-party virtual endpoints.
 - Unit test: the recording side of a cable routed into a bus that plays into its playback side is rejected as feedback.
 
+## QoL pass (2026-10-21)
+- **Automated:** engine core 64/64 (new: solo on Main only, solo pruning, undo coalescing/redo/depth cap, structural view, strip colors, hotkey settings round trip and validation); UI vitest 10/10 (dB step math and typed-level parsing, accelerator capture, hotkey actions, device toasts).
+- **IPC against an isolated engine** (`--config-dir` in a temp folder, so the user's config is untouched):
+  - `reorderBuses` keeps Main first; bad colors and empty names → `bad_args`.
+  - `setSolo` shows in `engine.solo` and clears.
+  - 20 volume updates 30 ms apart = 1 undo step. Undo restores the level, and redo re-applies it. Undo brings back a deleted channel and a deleted scene. An extra redo → `rejected`.
+  - Hotkey bindings saved; an unknown action is dropped.
+- **Voicemeeter detection on the dev machine:** with Voicemeeter Potato running, pointing Main at "Speakers (USBMIC1.)" gave `AUDCLNT_E_DEVICE_IN_USE`. The engine reported `{"voicemeeterRunning": true, "devicesInUse": ["Speakers (USBMIC1.)"]}`. "Close Voicemeeter" was **not** clicked during testing (it would have closed the user's running mixer).
+- Not yet checked by hand in the running app: global hotkeys while a game has focus; the Close Voicemeeter button; right-click menus; drag-to-reorder buses; clip-light latching.
+
 ## Not yet verified
 - Dragging the **Windows 11 Quick Settings** slider itself. The automation tool cannot operate the shell flyout. The same mechanism (an external `IAudioEndpointVolume` change and volume keys) is verified above. Manual check: open dB-Deck, drag Quick Settings, and the toolbar's Windows volume should follow and briefly highlight.
 - Process-loopback app capture end-to-end with a real app, including whether capture is before or after session volume.
