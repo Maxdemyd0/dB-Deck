@@ -138,7 +138,9 @@ kbd { font: 11px var(--font-mono); padding: 1px 6px; border-radius: 4px; backgro
 .strip-sub { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-3); min-height: 16px; min-width: 0; }
 .strip-body { display: flex; justify-content: center; gap: 8px; align-items: stretch; height: 210px; }
 .view-simple .strip-body { height: 190px; }
-.strip-value { text-align: center; font: 12px var(--font-mono); color: var(--text-2); }
+.strip-value { display: block; width: 100%; padding: 1px 0; border: 1px solid transparent; border-radius: 4px; background: none; text-align: center; font: 12px var(--font-mono); color: var(--text-2); cursor: text; }
+button.strip-value:hover:not(:disabled) { border-color: var(--border); color: var(--text); }
+input.strip-value { border-color: var(--accent); color: var(--text); outline: none; }
 .strip-foot { display: flex; gap: 6px; justify-content: center; }
 .strip-foot .btn { flex: 1; }
 .strip-menu { position: absolute; top: 8px; right: 6px; }
@@ -164,7 +166,9 @@ kbd { font: 11px var(--font-mono); padding: 1px 6px; border-radius: 4px; backgro
 .fader.disabled { opacity: 0.4; cursor: default; }
 .fader.muted .fill { background: var(--text-3); }
 
-.meter { display: flex; gap: 3px; height: 100%; padding: 10px 0; }
+.meter { position: relative; display: flex; gap: 3px; height: 100%; padding: 10px 0; }
+.meter .clip-led { position: absolute; top: 0; left: 0; right: 0; height: 6px; padding: 0; border: 0; border-radius: 2px; background: var(--danger); box-shadow: 0 0 6px var(--danger); cursor: pointer; visibility: hidden; }
+.meter.clipped .clip-led { visibility: visible; }
 .meter .bar { position: relative; width: 6px; height: 100%; background: var(--meter-bg); border-radius: 3px; overflow: hidden; }
 .meter .lvl { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: linear-gradient(to top, var(--meter-low) 0%, var(--meter-low) 70%, var(--meter-mid) 85%, var(--meter-high) 100%); background-size: 100% var(--meter-h, 190px); background-position: bottom; transition: height 60ms linear; }
 .meter .hold { position: absolute; left: 0; right: 0; height: 2px; background: var(--text); opacity: 0.8; bottom: 0; }

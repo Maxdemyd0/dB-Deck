@@ -3,6 +3,7 @@ import { BusStrip } from "../components/BusStrip";
 import { ChannelStrip, View } from "../components/ChannelStrip";
 import { EffectsEditor } from "../components/EffectsEditor";
 import { Fader } from "../components/Fader";
+import { StripValue } from "../components/StripValue";
 import { Icon } from "../components/Icon";
 import { MenuButton, Modal, Prompt } from "../components/Overlay";
 import { request } from "../engine/store";
@@ -137,7 +138,7 @@ export function MixerPage({ state, view, icons, appsOpen, searchRef }: { state: 
                         <div className="strip-body">
                           <Fader value={g.volume} label={`${g.name} group level`} muted={g.mute} onChange={(v) => void request("updateGroup", { id: g.id, volume: Math.round(v * 1000) / 1000 }).catch(() => {})} />
                         </div>
-                        <div className="strip-value">{Math.round(g.volume * 100)}%</div>
+                        <StripValue value={g.volume} max={1} scale="db" onCommit={(v) => void request("updateGroup", { id: g.id, volume: Math.round(v * 1000) / 1000 }).catch(() => {})} />
                         <div className="strip-foot">
                           <button className={`btn small mute${g.mute ? " on" : ""}`} onClick={() => request("updateGroup", { id: g.id, mute: !g.mute }).catch(() => {})}>M</button>
                         </div>

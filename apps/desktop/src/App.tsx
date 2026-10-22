@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { useEffect, useRef, useState } from "react";
 import type { View } from "./components/ChannelStrip";
 import { Icon } from "./components/Icon";
+import { CLEAR_CLIPS_EVENT } from "./components/Meter";
 import { Modal, Toasts } from "./components/Overlay";
 import { WindowsVolume } from "./components/WindowsVolume";
 import { busStatus } from "./components/BusStrip";
@@ -68,6 +69,11 @@ export function App() {
       const typing = (e.target as HTMLElement)?.tagName === "INPUT" && (e.target as HTMLInputElement).type !== "range";
       if (!e.ctrlKey || e.altKey) return;
       const k = e.key.toLowerCase();
+      if (k === "c" && e.shiftKey) {
+        window.dispatchEvent(new Event(CLEAR_CLIPS_EVENT));
+        e.preventDefault();
+        return;
+      }
       if (k === "1" || k === "2" || k === "3") {
         setView((["simple", "mixer", "advanced"] as View[])[Number(k) - 1]);
         e.preventDefault();

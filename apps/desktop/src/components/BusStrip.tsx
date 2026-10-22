@@ -1,10 +1,11 @@
-import { FADER_MAX, faderLabel } from "../engine/format";
+import { FADER_MAX } from "../engine/format";
 import { request } from "../engine/store";
 import type { Bus, BusRuntime, Device } from "../engine/types";
 import { Fader } from "./Fader";
 import { Icon } from "./Icon";
 import { Meter } from "./Meter";
 import { MenuButton } from "./Overlay";
+import { StripValue } from "./StripValue";
 
 export function busStatus(rt?: BusRuntime): { text: string; cls: string } {
   switch (rt?.status) {
@@ -49,7 +50,7 @@ export function BusStrip({ bus, runtime, devices, onEffects }: { bus: Bus; runti
         <Meter kind="buses" id={bus.id} />
         <Fader value={bus.volume} unity={1} max={FADER_MAX} label={`${bus.name} level`} muted={bus.mute} onChange={(v) => void update({ volume: Math.round(v * 1000) / 1000 })} />
       </div>
-      <div className="strip-value">{faderLabel(bus.volume, true)}</div>
+      <StripValue value={bus.volume} max={FADER_MAX} scale="db" title="Up to +20 dB" onCommit={(v) => void update({ volume: Math.round(v * 1000) / 1000 })} />
       <div className="strip-foot">
         <button className={`btn small mute${bus.mute ? " on" : ""}`} onClick={() => update({ mute: !bus.mute })} aria-pressed={bus.mute}>M</button>
         <button className={`btn small toggle${bus.effects.some((e) => e.enabled) ? " on" : ""}`} onClick={onEffects}>FX</button>

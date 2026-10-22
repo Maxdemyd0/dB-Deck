@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { clamp } from "../engine/format";
+import { clamp, stepFaderDb } from "../engine/format";
 
 interface Props {
   /** Confirmed engine value, 0..max. */
@@ -15,6 +15,8 @@ interface Props {
   unity?: number;
   resetValue?: number;
   title?: string;
+  /** "db": wheel/arrow keys step in dB (managed audio). "percent": Windows session volume. */
+  scale?: "db" | "percent";
 }
 
 /**
@@ -22,7 +24,7 @@ interface Props {
  * locally; the moment it is released the fader shows the engine's confirmed
  * value again (which normally equals the last value sent).
  */
-export function Fader({ value, onChange, disabled, muted, label, unity, resetValue = 1, title, max = 1 }: Props) {
+export function Fader({ value, onChange, disabled, muted, label, unity, resetValue = 1, title, max = 1, scale = "db" }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<number | null>(null);
   const lastSent = useRef(0);
@@ -53,6 +55,26 @@ export function Fader({ value, onChange, disabled, muted, label, unity, resetVal
     const r = ref.current!.getBoundingClientRect();
     return clamp(1 - (clientY - r.top - 10) / (r.height - 20), 0, 1) * max;
   };
+
+  // One step: 1 dB (Ctrl 0.1 dB, Shift 3 dB), or 2% (Ctrl 1%, Shift 10%) for session volume.
+  const step = (dir: 1 | -1, e: { ctrlKey: boolean; shiftKey: boolean }) => {
+    if (scale === "db") return stepFaderDb(value, dir * (e.ctrlKey ? 0.1 : e.shiftKey ? 3 : 1), max);
+    return clamp(value + dir * (e.ctrlKey ? 0.01 : e.shiftKey ? 0.1 : 0.02), 0, max);
+  };
+
+  // Wheel needs a non-passive listener so Ctrl+wheel adjusts finely instead of zooming the page.
+  const onWheel = useRef<(e: WheelEvent) => void>(() => {});
+  onWheel.current = (e) => {
+    if (disabled || e.deltaY === 0) return;
+    e.preventDefault();
+    send(step(e.deltaY < 0 ? 1 : -1, e), true);
+  };
+  useEffect(() => {
+    const el = ref.current!;
+    const h = (e: WheelEvent) => onWheel.current(e);
+    el.addEventListener("wheel", h, { passive: false });
+    return () => el.removeEventListener("wheel", h);
+  }, []);
 
   const shown = drag ?? value;
   const pos = clamp(shown / max, 0, 1);  // 0..1 along the track
@@ -91,16 +113,11 @@ export function Fader({ value, onChange, disabled, muted, label, unity, resetVal
       }}
       onPointerCancel={() => setDrag(null)}
       onDoubleClick={() => !disabled && send(resetValue, true)}
-      onWheel={(e) => {
-        if (disabled) return;
-        send(clamp(value + (e.deltaY < 0 ? 0.02 : -0.02), 0, max), true);
-      }}
       onKeyDown={(e) => {
         if (disabled) return;
-        const step = e.shiftKey ? 0.1 : 0.02;
-        if (e.key === "ArrowUp" || e.key === "ArrowRight") send(clamp(value + step, 0, max), true);
-        else if (e.key === "ArrowDown" || e.key === "ArrowLeft") send(clamp(value - step, 0, max), true);
-        else if (e.key === "Home") send(1, true);
+        if (e.key === "ArrowUp" || e.key === "ArrowRight") send(step(1, e), true);
+        else if (e.key === "ArrowDown" || e.key === "ArrowLeft") send(step(-1, e), true);
+        else if (e.key === "Home") send(Math.min(1, max), true);
         else if (e.key === "End") send(0, true);
         else return;
         e.preventDefault();

@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { FADER_MAX, faderLabel } from "../engine/format";
+import { FADER_MAX } from "../engine/format";
 import { request } from "../engine/store";
 import type { Bus, Channel, ChannelRuntime, Device, Group } from "../engine/types";
 import { Fader } from "./Fader";
 import { Icon } from "./Icon";
 import { Meter } from "./Meter";
 import { MenuButton, MenuItem } from "./Overlay";
+import { StripValue } from "./StripValue";
 
 export type View = "simple" | "mixer" | "advanced";
 
@@ -160,11 +161,18 @@ export function ChannelStrip(p: Props) {
           muted={c.mute}
           unity={canBoost ? 1 : undefined}
           max={canBoost ? FADER_MAX : 1}
+          scale={canBoost ? "db" : "percent"}
           title={sessionHint}
           onChange={(v) => void update({ volume: Math.round(v * 1000) / 1000 })}
         />
       </div>
-      <div className="strip-value" title={canBoost ? "Up to +20 dB" : "Windows app volume (max 100%). Enable app capture to boost."}>{faderLabel(c.volume, c.type !== "app")}</div>
+      <StripValue
+        value={c.volume}
+        max={canBoost ? FADER_MAX : 1}
+        scale={canBoost ? "db" : "percent"}
+        title={canBoost ? "Up to +20 dB" : "Windows app volume (max 100%). Enable app capture to boost."}
+        onCommit={(v) => void update({ volume: Math.round(v * 1000) / 1000 })}
+      />
 
       {view === "advanced" && managed && (
         <div className="col" style={{ gap: 4 }}>
