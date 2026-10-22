@@ -48,6 +48,7 @@ Environment variables: `DBDECK_TEST_RENDER_DEVICE` (substring of the device name
   - 20 volume updates 30 ms apart = 1 undo step. Undo restores the level, and redo re-applies it. Undo brings back a deleted channel and a deleted scene. An extra redo → `rejected`.
   - Hotkey bindings saved; an unknown action is dropped.
 - **Voicemeeter detection on the dev machine:** with Voicemeeter Potato running, pointing Main at "Speakers (USBMIC1.)" gave `AUDCLNT_E_DEVICE_IN_USE`. The engine reported `{"voicemeeterRunning": true, "devicesInUse": ["Speakers (USBMIC1.)"]}`. "Close Voicemeeter" was **not** clicked during testing (it would have closed the user's running mixer).
+- **Known flaky test:** "virtual cable carries real PCM" (VB-CABLE round trip) failed in about 1 of 3 runs on the dev machine while Voicemeeter was running. The capture side had 3–4 underruns, and the measured frequency was 985–994 Hz against a ±10 Hz tolerance. The pre-QoL build (e4e15b0) fails the same way, so the cause is the machine's state, not this change. The other 8 Windows tests passed every run.
 - Not yet checked by hand in the running app: global hotkeys while a game has focus; the Close Voicemeeter button; right-click menus; drag-to-reorder buses; clip-light latching.
 
 ## Not yet verified
