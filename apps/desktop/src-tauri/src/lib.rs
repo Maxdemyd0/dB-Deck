@@ -185,6 +185,8 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| show_main(app)))
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec!["--minimized"])))
+        // Global hotkeys: registered and handled by the UI, which keeps running while hidden in the tray.
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(AppState { engine: engine.clone(), tray: Mutex::new(None), tray_signature: Mutex::new(String::new()) })
         .invoke_handler(tauri::generate_handler![engine_request, engine_status, exit_app, set_autostart, get_autostart])
         .setup(move |app| {

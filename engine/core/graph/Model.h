@@ -129,11 +129,28 @@ struct ProfileConfig {
     SceneConfig* findScene(const std::string& id);
 };
 
+// A global keyboard shortcut. The desktop app registers it with Windows and
+// runs the action; the engine only stores and validates it.
+struct HotkeyBinding {
+    std::string accelerator;  // e.g. "Ctrl+Alt+M"
+    std::string action;       // see isValidHotkeyAction
+    std::string targetId;     // channel/bus, scene or profile ID ("" for masterMute)
+};
+
+// "toggleMute" | "pushToMute" | "volumeUp" | "volumeDown" (target: channel or bus),
+// "masterMute", "applyScene" (target: scene), "loadProfile" (target: profile).
+bool isValidHotkeyAction(const std::string& action);
+
 struct EngineSettings {
     std::string bufferMode = "normal";  // "low" | "normal" | "safe"
     int meterRateHz = 30;
     bool showSystemSounds = false;
+    std::vector<HotkeyBinding> hotkeys;
 };
+
+json toJson(const HotkeyBinding&);
+// Parses a hotkey list, dropping invalid entries. Throws ConfigError if not an array.
+std::vector<HotkeyBinding> hotkeysFromJson(const json& arr, const std::string& path);
 
 struct AppConfig {
     static constexpr int kSchemaVersion = 1;

@@ -25,6 +25,7 @@
 #include "DeviceManager.h"
 #include "EndpointVolumeController.h"
 #include "PipeServer.h"
+#include "ProcessCheck.h"
 #include "SessionManager.h"
 #include "WasapiStreams.h"
 #include "audio/ToneGenerator.h"
@@ -141,6 +142,8 @@ private:
     using Clock = std::chrono::steady_clock;
     Clock::time_point started_ = Clock::now();
     Clock::time_point lastMeters_, lastHealth_, lastSessions_, lastOutputsRetry_, lastStateSent_, lastVolumeRefresh_;
+    Clock::time_point lastProcessCheck_;
+    std::vector<ProcessEntry> voicemeeter_;  // running Voicemeeter instances (checked every few seconds)
     Clock::time_point dirtySince_;
     bool dirty_ = false;
     bool stateDirty_ = true;

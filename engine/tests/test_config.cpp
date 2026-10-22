@@ -197,3 +197,20 @@ TEST("config store: path comparison ignores the long-path prefix, case and trail
                                  R"(C:\Users\x\AppData\Local\Packages\P\LocalCache\Roaming\dB-Deck\config.json)"));
 }
 #endif
+
+TEST("config: hotkeys round trip; invalid bindings are dropped") {
+    AppConfig c = sampleConfig();
+    c.settings.hotkeys = {{"Ctrl+Alt+M", "toggleMute", "mic-id"}, {"Ctrl+Alt+0", "masterMute", ""}};
+    AppConfig back = configFromJson(json::parse(toJson(c).dump()));
+    CHECK(back.settings.hotkeys.size() == 2);
+    CHECK(back.settings.hotkeys[0].accelerator == "Ctrl+Alt+M");
+    CHECK(back.settings.hotkeys[0].targetId == "mic-id");
+    json j = toJson(c);
+    j["settings"]["hotkeys"].push_back({{"accelerator", "Ctrl+X"}, {"action", "formatDisk"}, {"targetId", "x"}});
+    j["settings"]["hotkeys"].push_back({{"accelerator", ""}, {"action", "masterMute"}});
+    j["settings"]["hotkeys"].push_back({{"accelerator", "Ctrl+Y"}, {"action", "toggleMute"}});  // no target
+    CHECK(configFromJson(j).settings.hotkeys.size() == 2);
+    json old = toJson(sampleConfig());
+    old["settings"].erase("hotkeys");
+    CHECK(configFromJson(old).settings.hotkeys.empty());
+}

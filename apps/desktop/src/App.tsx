@@ -8,7 +8,8 @@ import { Modal, Toasts } from "./components/Overlay";
 import { WindowsVolume } from "./components/WindowsVolume";
 import { busStatus } from "./components/BusStrip";
 import { FADER_MAX, faderLabel } from "./engine/format";
-import { inTauri, request, startEngineStore, useEngine } from "./engine/store";
+import { syncHotkeys } from "./engine/hotkeys";
+import { inTauri, request, startEngineStore, toast, useEngine } from "./engine/store";
 import type { EngineState } from "./engine/types";
 import { InputsPage, OutputsPage, RoutingPage, VirtualDevicesPage } from "./pages/DevicePages";
 import { DiagnosticsPage } from "./pages/DiagnosticsPage";
@@ -44,6 +45,11 @@ export function App() {
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => startEngineStore(), []);
+  // Global hotkeys follow the saved bindings (registered once per change).
+  const hotkeySig = JSON.stringify(state?.settings.hotkeys ?? []);
+  useEffect(() => {
+    if (state) void syncHotkeys(state.settings.hotkeys ?? []);
+  }, [hotkeySig, !!state]);
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     writePref("dbdeck.theme", theme);
@@ -141,6 +147,7 @@ export function App() {
             {state && <span className="faint small">Showing the last known state; controls resume when the engine is back.</span>}
           </div>
         )}
+        {state && (state.engine.conflicts?.devicesInUse.length ?? 0) > 0 && <InUseBanner state={state} />}
         {state && state.engine.warnings.length > 0 && (
           <div className="banner warn">
             <Icon name="warn" />
@@ -252,6 +259,41 @@ function Toolbar({ state, connected, view, setView }: { state: EngineState | nul
         {connected ? (state?.engine.healthy ? "Engine OK" : "Check outputs") : "Offline"}
       </div>
     </header>
+  );
+}
+
+/** Shown when another app (usually Voicemeeter) holds devices dB-Deck needs. */
+function InUseBanner({ state }: { state: EngineState }) {
+  const c = state.engine.conflicts!;
+  const [closing, setClosing] = useState(false);
+  const devices = c.devicesInUse.join(", ");
+  const close = async () => {
+    setClosing(true);
+    try {
+      const r = await request<{ wasRunning: boolean; closeRequested: number }>("closeVoicemeeter");
+      if (r.wasRunning && r.closeRequested === 0) toast("warn", "Voicemeeter didn't respond. Exit it from its tray icon.");
+    } catch {
+      /* toast shown */
+    }
+    // dB-Deck retries the devices automatically once they are free.
+    setTimeout(() => setClosing(false), 4000);
+  };
+  return (
+    <div className="banner warn">
+      <Icon name="warn" />
+      <span className="grow">
+        {c.voicemeeterRunning ? (
+          <>Voicemeeter is running and holding <strong>{devices}</strong>. Close it so dB-Deck can use {c.devicesInUse.length > 1 ? "them" : "it"}.</>
+        ) : (
+          <>Another app is using <strong>{devices}</strong> exclusively. dB-Deck will connect when it's free.</>
+        )}
+      </span>
+      {c.voicemeeterRunning && (
+        <button className="btn small" disabled={closing} onClick={() => void close()}>
+          {closing ? "Closing…" : "Close Voicemeeter"}
+        </button>
+      )}
+    </div>
   );
 }
 

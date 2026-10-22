@@ -96,7 +96,30 @@ async function refreshIcons() {
   }
 }
 
+/**
+ * Device events worth a toast: an output or input that was working went away,
+ * or came back. Only compares states of the same profile.
+ */
+export function deviceChanges(prev: EngineState | null, next: EngineState): { kind: "warn" | "info"; text: string }[] {
+  if (!prev || prev.activeProfileId !== next.activeProfileId) return [];
+  const out: { kind: "warn" | "info"; text: string }[] = [];
+  for (const b of next.profile.buses) {
+    const was = prev.runtime.buses[b.id]?.status, now = next.runtime.buses[b.id]?.status;
+    const name = next.runtime.buses[b.id]?.activeDeviceName || b.deviceName || b.name;
+    if (was === "connected" && now === "disconnected") out.push({ kind: "warn", text: `${name} disconnected (${b.name})` });
+    if (was === "disconnected" && now === "connected") out.push({ kind: "info", text: `${name} reconnected (${b.name})` });
+  }
+  for (const c of next.profile.channels) {
+    if (c.type !== "hardwareInput" && c.type !== "endpointLoopback") continue;
+    const was = prev.runtime.channels[c.id]?.status, now = next.runtime.channels[c.id]?.status;
+    if (was === "connected" && now === "disconnected") out.push({ kind: "warn", text: `${c.deviceName || c.name} disconnected` });
+    if (was === "disconnected" && now === "connected") out.push({ kind: "info", text: `${c.deviceName || c.name} reconnected` });
+  }
+  return out;
+}
+
 function applyState(state: EngineState) {
+  for (const d of deviceChanges(snapshot.state, state)) toast(d.kind, d.text);
   set({ state, connected: true });
   if (state.engine.iconsVersion !== iconsVersion) void refreshIcons();
 }
@@ -133,6 +156,11 @@ export function startEngineStore() {
       }
     }
   });
+}
+
+/** Latest engine state, for handlers that run outside React (global hotkeys). */
+export function currentState(): EngineState | null {
+  return snapshot.state;
 }
 
 export function useEngine(): Snapshot {

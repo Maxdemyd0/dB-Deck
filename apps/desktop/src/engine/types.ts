@@ -156,6 +156,17 @@ export interface WindowsVolume {
   main: EndpointVolume;
 }
 
+export type HotkeyAction = "toggleMute" | "pushToMute" | "volumeUp" | "volumeDown" | "masterMute" | "applyScene" | "loadProfile";
+
+/** A global keyboard shortcut (works while dB-Deck is hidden or a game has focus). */
+export interface Hotkey {
+  /** e.g. "Ctrl+Alt+KeyM" */
+  accelerator: string;
+  action: HotkeyAction;
+  /** Channel/bus, scene or profile ID; "" for masterMute. */
+  targetId: string;
+}
+
 export interface EngineState {
   engine: {
     version: string;
@@ -170,9 +181,11 @@ export interface EngineState {
     redoDepth?: number;
     /** Soloed channel IDs (runtime only). */
     solo?: string[];
+    /** Other apps holding audio devices (Voicemeeter, exclusive mode). */
+    conflicts?: { voicemeeterRunning: boolean; devicesInUse: string[] };
     iconsVersion: number;
   };
-  settings: { bufferMode: "low" | "normal" | "safe"; meterRateHz: number; showSystemSounds: boolean };
+  settings: { bufferMode: "low" | "normal" | "safe"; meterRateHz: number; showSystemSounds: boolean; hotkeys?: Hotkey[] };
   profiles: { id: string; name: string }[];
   activeProfileId: string;
   profile: Profile;

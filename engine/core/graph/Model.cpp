@@ -60,6 +60,32 @@ json structuralView(const ProfileConfig& p) {
     return j;
 }
 
+bool isValidHotkeyAction(const std::string& a) {
+    static const std::set<std::string> kActions = {"toggleMute", "pushToMute", "volumeUp",    "volumeDown",
+                                                   "masterMute", "applyScene", "loadProfile"};
+    return kActions.count(a) > 0;
+}
+
+json toJson(const HotkeyBinding& h) {
+    return {{"accelerator", h.accelerator}, {"action", h.action}, {"targetId", h.targetId}};
+}
+
+std::vector<HotkeyBinding> hotkeysFromJson(const json& arr, const std::string& path) {
+    if (!arr.is_array()) throw ConfigError(path + ": expected an array");
+    std::vector<HotkeyBinding> out;
+    for (auto& e : arr) {
+        if (!e.is_object()) continue;
+        HotkeyBinding h;
+        h.accelerator = e.value("accelerator", "");
+        h.action = e.value("action", "");
+        h.targetId = e.value("targetId", "");
+        if (h.accelerator.empty() || h.accelerator.size() > 64 || !isValidHotkeyAction(h.action)) continue;
+        if (h.action != "masterMute" && h.targetId.empty()) continue;
+        out.push_back(std::move(h));
+    }
+    return out;
+}
+
 bool isValidColor(const std::string& s) {
     if (s.empty()) return true;
     if (s.size() != 7 || s[0] != '#') return false;
@@ -248,7 +274,12 @@ json toJson(const AppConfig& c) {
             {"settings",
              {{"bufferMode", c.settings.bufferMode},
               {"meterRateHz", c.settings.meterRateHz},
-              {"showSystemSounds", c.settings.showSystemSounds}}},
+              {"showSystemSounds", c.settings.showSystemSounds},
+              {"hotkeys", [&] {
+                   json h = json::array();
+                   for (auto& k : c.settings.hotkeys) h.push_back(toJson(k));
+                   return h;
+               }()}}},
             {"profiles", profiles}};
 }
 
@@ -481,6 +512,7 @@ AppConfig configFromJson(const json& j) {
             c.settings.bufferMode = "normal";
         c.settings.meterRateHz = static_cast<int>(getFloat(*it, "meterRateHz", "/settings", 30, 5, 60));
         c.settings.showSystemSounds = getBool(*it, "showSystemSounds", "/settings", false);
+        if (auto h = it->find("hotkeys"); h != it->end()) c.settings.hotkeys = hotkeysFromJson(*h, "/settings/hotkeys");
     }
     if (const json* arr = getArray(j, "profiles", ""))
         for (size_t i = 0; i < arr->size(); ++i)

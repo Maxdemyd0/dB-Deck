@@ -13,7 +13,20 @@
       "properties": {
         "bufferMode": { "enum": ["low", "normal", "safe"] },
         "meterRateHz": { "type": "number", "minimum": 5, "maximum": 60 },
-        "showSystemSounds": { "type": "boolean" }
+        "showSystemSounds": { "type": "boolean" },
+        "hotkeys": {
+          "type": "array",
+          "description": "global keyboard shortcuts; invalid entries are dropped on load",
+          "items": {
+            "type": "object",
+            "required": ["accelerator", "action"],
+            "properties": {
+              "accelerator": { "type": "string", "minLength": 1, "maxLength": 64, "description": "e.g. Ctrl+Alt+KeyM" },
+              "action": { "enum": ["toggleMute", "pushToMute", "volumeUp", "volumeDown", "masterMute", "applyScene", "loadProfile"] },
+              "targetId": { "type": "string", "description": "channel/bus, scene or profile ID; empty for masterMute" }
+            }
+          }
+        }
       }
     },
     "profiles": { "type": "array", "items": { "$ref": "#/$defs/profile" } }

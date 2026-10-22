@@ -51,6 +51,7 @@ if(WIN32 AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/win/main.cpp)
         win/WasapiStreams.cpp
         win/AudioEngine.cpp
         win/PipeServer.cpp
+        win/ProcessCheck.cpp
         win/EngineService.cpp)
     target_include_directories(dbdeck_win PUBLIC win)
     target_link_libraries(dbdeck_win PUBLIC dbdeck_core ole32 oleaut32 uuid avrt mmdevapi

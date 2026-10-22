@@ -258,3 +258,9 @@ table.tbl { width: 100%; border-collapse: collapse; }
 @media (max-width: 1250px) { .toolbar .vol-widget .nm, .toolbar .tb-label { display: none; } .toolbar .vol-widget .hslider { width: 80px; } }
 
 .menu { max-height: 70vh; overflow-y: auto; }
+
+/* Global hotkeys editor */
+.hotkey-row { gap: 8px; flex-wrap: wrap; }
+.hotkey-row select { max-width: 200px; }
+.hotkey-capture { min-width: 120px; justify-content: center; }
+.hotkey-capture.on { border-color: var(--accent); color: var(--accent); }

@@ -261,6 +261,17 @@ void EngineService::tick() {
             markStateDirty();
         }
     }
+    if (since(lastProcessCheck_) > 3000) {
+        lastProcessCheck_ = now;
+        auto vm = findVoicemeeter();
+        const bool changed = vm.empty() != voicemeeter_.empty();
+        voicemeeter_ = std::move(vm);
+        if (changed) {
+            log::info(voicemeeter_.empty() ? "Voicemeeter closed" : "Voicemeeter is running");
+            markStateDirty();
+            if (voicemeeter_.empty()) lastOutputsRetry_ = {};  // reclaim its devices now
+        }
+    }
     if (since(lastOutputsRetry_) > 2000) {
         lastOutputsRetry_ = now;
         // Retry outputs/inputs that should be live (e.g. device returned, format renegotiation).
@@ -1036,6 +1047,19 @@ json EngineService::buildState() {
     bool healthy = true;
     for (auto& [id, b] : busRuntime.items())
         if (b["status"] == "error") healthy = false;
+    json hotkeys = json::array();
+    for (auto& k : config_.settings.hotkeys) hotkeys.push_back(toJson(k));
+    // Devices another app holds exclusively (typically Voicemeeter).
+    std::set<std::string> inUse;
+    auto heldByOther = [](const json& rt) {
+        return rt.contains("error") && rt["error"].is_string() &&
+               rt["error"].get<std::string>().find("DEVICE_IN_USE") != std::string::npos;
+    };
+    for (auto& [id, b] : busRuntime.items())
+        if (heldByOther(b)) inUse.insert(b.value("activeDeviceName", ""));
+    for (auto& c : p.channels)
+        if (heldByOther(chRuntime[c.id])) inUse.insert(c.deviceName.empty() ? c.name : c.deviceName);
+    json conflicts = {{"voicemeeterRunning", !voicemeeter_.empty()}, {"devicesInUse", inUse}};
     return {{"engine",
              {{"version", kEngineVersion},
               {"protocol", kProtocolVersion},
@@ -1048,11 +1072,13 @@ json EngineService::buildState() {
               {"undoDepth", history_.undoDepth()},
               {"redoDepth", history_.redoDepth()},
               {"solo", registry_.solo},
+              {"conflicts", conflicts},
               {"iconsVersion", iconsVersion_}}},
             {"settings",
              {{"bufferMode", config_.settings.bufferMode},
               {"meterRateHz", config_.settings.meterRateHz},
-              {"showSystemSounds", config_.settings.showSystemSounds}}},
+              {"showSystemSounds", config_.settings.showSystemSounds},
+              {"hotkeys", hotkeys}}},
             {"profiles", profiles},
             {"activeProfileId", p.id},
             {"profile", toJson(p)},
@@ -1635,6 +1661,13 @@ void EngineService::registerCommands() {
         }
         if (auto v = optFloat(a, "meterRateHz", 5, 60)) config_.settings.meterRateHz = static_cast<int>(*v);
         if (auto v = optBool(a, "showSystemSounds")) config_.settings.showSystemSounds = *v;
+        if (a.contains("hotkeys")) {
+            try {
+                config_.settings.hotkeys = hotkeysFromJson(a["hotkeys"], "hotkeys");
+            } catch (const ConfigError& e) {
+                throw ProtocolError("bad_args", e.what());
+            }
+        }
         markDirty();
         if (rebuild) {
             // Buffer changes require reopening streams (brief, faded interruption).
@@ -1744,6 +1777,15 @@ void EngineService::registerCommands() {
         if (!snap) throw ProtocolError("rejected", "nothing to redo");
         restoreSnapshot(*snap);
         return json{{"undoDepth", history_.undoDepth()}, {"redoDepth", history_.redoDepth()}};
+    };
+    h["closeVoicemeeter"] = [this](const json&) {
+        // Only on the user's request: asks Voicemeeter to close like clicking X.
+        auto vm = findVoicemeeter();
+        if (vm.empty()) return json{{"wasRunning", false}, {"closeRequested", 0}};
+        const int n = requestClose(vm);
+        log::info("Asked Voicemeeter to close (" + std::to_string(n) + " windows)");
+        lastProcessCheck_ = {};
+        return json{{"wasRunning", true}, {"closeRequested", n}};
     };
     h["shutdown"] = [this](const json&) {
         quit_ = true;

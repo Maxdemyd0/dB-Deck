@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
+import { HotkeysEditor } from "../components/HotkeysEditor";
 import { inTauri, request, toast } from "../engine/store";
 import type { EngineState } from "../engine/types";
 
@@ -69,6 +70,7 @@ export function SettingsPage({ state, theme, setTheme }: { state: EngineState; t
           </div>
         </div>
       </div>
+      <HotkeysEditor state={state} />
       <div className="card">
         <h3>Keyboard shortcuts</h3>
         <table className="tbl">
@@ -77,9 +79,13 @@ export function SettingsPage({ state, theme, setTheme }: { state: EngineState; t
               ["Ctrl+1 / 2 / 3", "Simple / Mixer / Advanced view"],
               ["Ctrl+M", "Mute all managed audio"],
               ["Ctrl+Z", "Undo last mixer change"],
+              ["Ctrl+Y or Ctrl+Shift+Z", "Redo"],
               ["Ctrl+F", "Search Available Apps"],
-              ["Arrow keys on a fader", "Adjust (Shift for larger steps); Home = unity"],
+              ["Ctrl+Shift+C", "Clear clip lights"],
+              ["Wheel or arrow keys on a fader", "1 dB steps (Ctrl 0.1 dB, Shift 3 dB); Home = unity"],
               ["Double-click a fader", "Reset to unity"],
+              ["Click the level under a fader", "Type an exact level (e.g. -6, +3.5, -inf)"],
+              ["Right-click a strip", "Its menu"],
             ].map(([k, v]) => (
               <tr key={k}><td style={{ width: 220 }}><kbd>{k}</kbd></td><td className="muted">{v}</td></tr>
             ))}
