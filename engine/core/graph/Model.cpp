@@ -31,6 +31,35 @@ std::optional<ChannelType> channelTypeFromString(const std::string& s) {
     return std::nullopt;
 }
 
+json structuralView(const ProfileConfig& p) {
+    json j = toJson(p);
+    auto stripEffects = [](json& fx) {
+        for (auto& e : fx) {
+            e.erase("params");
+            e.erase("enabled");
+        }
+    };
+    auto stripSends = [](json& sends) {
+        for (auto& s : sends) s.erase("gain");
+    };
+    for (auto& c : j["channels"]) {
+        for (const char* k : {"name", "color", "volume", "gainDb", "balance", "mute"}) c.erase(k);
+        stripSends(c["sends"]);
+        stripEffects(c["effects"]);
+    }
+    for (auto& b : j["buses"]) {
+        for (const char* k : {"name", "color", "volume", "mute"}) b.erase(k);
+        stripSends(b["busSends"]);
+        stripEffects(b["effects"]);
+    }
+    for (auto& g : j["groups"])
+        for (const char* k : {"name", "volume", "mute", "collapsed"}) g.erase(k);
+    j.erase("scenes");
+    j.erase("layout");
+    j.erase("name");
+    return j;
+}
+
 bool isValidColor(const std::string& s) {
     if (s.empty()) return true;
     if (s.size() != 7 || s[0] != '#') return false;

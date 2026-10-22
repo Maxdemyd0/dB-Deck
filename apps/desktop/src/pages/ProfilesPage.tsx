@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Icon } from "../components/Icon";
-import { Modal, Prompt } from "../components/Overlay";
-import { request } from "../engine/store";
+import { Confirm, Modal, Prompt } from "../components/Overlay";
+import { deleteWithUndo, request } from "../engine/store";
 import type { EngineState } from "../engine/types";
 
 interface ImportResult {
@@ -20,6 +20,7 @@ export function ProfilesPage({ state }: { state: EngineState }) {
   const [prompt, setPrompt] = useState<PromptState>(null);
   const [imported, setImported] = useState<ImportResult | null>(null);
   const [importing, setImporting] = useState(false);
+  const [deleting, setDeleting] = useState<{ id: string; name: string } | null>(null);
   const runImport = () => {
     setImporting(true);
     request<ImportResult>("importVoicemeeter")
@@ -57,7 +58,7 @@ export function ProfilesPage({ state }: { state: EngineState }) {
                 <span className="grow ellipsis">{p.name}</span>
                 {p.id === active ? <span className="badge accent">Active</span> : <button className="btn small primary" onClick={() => request("loadProfile", { id: p.id }).catch(() => {})}>Load</button>}
                 <button className="btn small ghost" onClick={() => setPrompt({ title: "Rename profile", initial: p.name, submit: "Rename", run: (name) => request("renameProfile", { id: p.id, name }).catch(() => {}) })}>Rename</button>
-                <button className="btn small ghost danger" disabled={p.id === active || state.profiles.length === 1} title={p.id === active ? "Load another profile first" : undefined} onClick={() => request("deleteProfile", { id: p.id }).catch(() => {})}>Delete</button>
+                <button className="btn small ghost danger" disabled={p.id === active || state.profiles.length === 1} title={p.id === active ? "Load another profile first" : undefined} onClick={() => setDeleting({ id: p.id, name: p.name })}>Delete</button>
               </div>
             ))}
           </div>
@@ -78,12 +79,21 @@ export function ProfilesPage({ state }: { state: EngineState }) {
                 <button className="btn small primary" onClick={() => request("applyScene", { id: s.id }).catch(() => {})}>Apply</button>
                 <button className="btn small ghost" title="Replace this scene with the current levels" onClick={() => request("updateScene", { id: s.id, recapture: true }).catch(() => {})}>Update</button>
                 <button className="btn small ghost" onClick={() => setPrompt({ title: "Rename scene", initial: s.name, submit: "Rename", run: (name) => request("updateScene", { id: s.id, name }).catch(() => {}) })}>Rename</button>
-                <button className="btn small ghost danger" onClick={() => request("deleteScene", { id: s.id }).catch(() => {})}>Delete</button>
+                <button className="btn small ghost danger" onClick={() => void deleteWithUndo("deleteScene", { id: s.id }, `scene "${s.name}"`)}>Delete</button>
               </div>
             ))}
           </div>
         </div>
       </div>
+      {deleting && (
+        <Confirm
+          title="Delete profile?"
+          text={<>“{deleting.name}” and all its channels, buses, routing and scenes will be deleted. This can't be undone.</>}
+          confirmLabel="Delete profile"
+          onConfirm={() => void request("deleteProfile", { id: deleting.id }).catch(() => {})}
+          onClose={() => setDeleting(null)}
+        />
+      )}
       {imported && (
         <Modal
           title={`Imported "${imported.profileName}"`}

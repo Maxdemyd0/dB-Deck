@@ -2,7 +2,7 @@ import { Icon } from "../components/Icon";
 import { Meter } from "../components/Meter";
 import { WindowsVolume } from "../components/WindowsVolume";
 import { busStatus } from "../components/BusStrip";
-import { request } from "../engine/store";
+import { deleteWithUndo, request } from "../engine/store";
 import type { Device, EngineState } from "../engine/types";
 
 function DeviceState({ d }: { d: Device }) {
@@ -148,7 +148,7 @@ export function OutputsPage({ state }: { state: EngineState }) {
                 <span className={`dot ${s.cls}`} />
                 <span className="grow faint small ellipsis">{s.text}</span>
                 <div style={{ width: 110 }}><Meter kind="buses" id={b.id} horizontal /></div>
-                {!b.isMain && <button className="btn small ghost danger" onClick={() => request("deleteBus", { id: b.id }).catch(() => {})}>Delete</button>}
+                {!b.isMain && <button className="btn small ghost danger" onClick={() => void deleteWithUndo("deleteBus", { id: b.id }, `bus "${b.name}"`)}>Delete</button>}
               </div>
             );
           })}

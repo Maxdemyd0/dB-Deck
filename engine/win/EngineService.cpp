@@ -18,7 +18,6 @@ namespace dbdeck::win {
 namespace {
 
 constexpr const char* kEngineVersion = "1.0.0";
-constexpr size_t kMaxUndo = 50;
 
 std::map<uint32_t, uint32_t> parentPids() {
     std::map<uint32_t, uint32_t> m;
@@ -661,15 +660,21 @@ void EngineService::adoptExternalSessionChanges() {
 // ---------------------------------------------------------------------------
 // Mutation helper
 
-json EngineService::mutate(bool undoable, bool structural, const std::function<json(ProfileConfig&)>& fn) {
+// Coalescing key for a continuous edit: the target plus the fields it changes.
+static std::string editKey(const std::string& prefix, const json& args) {
+    std::string k = prefix;
+    for (auto& [name, v] : args.items())
+        if (name != "id") k += ":" + name;
+    return k;
+}
+
+json EngineService::mutate(bool undoable, bool structural, const std::function<json(ProfileConfig&)>& fn,
+                           const std::string& coalesceKey) {
     ProfileConfig& live = profile();
     ProfileConfig copy = live;
     json result = fn(copy);
     if (auto issue = validateRouting(copy, cablePairs())) throw ProtocolError("rejected", issue->message);
-    if (undoable) {
-        undo_.push_back(toJson(live));
-        if (undo_.size() > kMaxUndo) undo_.pop_front();
-    }
+    if (undoable) history_.record([&] { return toJson(live); }, coalesceKey, UndoHistory::Clock::now());
     live = std::move(copy);
     markDirty();
     if (structural) {
@@ -679,6 +684,21 @@ json EngineService::mutate(bool undoable, bool structural, const std::function<j
         applyLiveParams();
     }
     return result;
+}
+
+void EngineService::restoreSnapshot(const json& snap) {
+    ProfileConfig restored = profileFromJson(snap, "");
+    if (restored.id != profile().id) throw ProtocolError("rejected", "undo history belongs to another profile");
+    normalizeProfile(restored);
+    const bool sameShape = structuralView(restored) == structuralView(profile());
+    profile() = std::move(restored);
+    markDirty();
+    if (sameShape) {
+        applyLiveParams();  // levels, mutes, sends: instant, no audio gap
+    } else {
+        rebuildAudio();
+        rebindEndpointVolumes();
+    }
 }
 
 void EngineService::applyLiveParams() {
@@ -1025,7 +1045,8 @@ json EngineService::buildState() {
               {"healthy", healthy},
               {"masterMute", mixer_.masterMuted()},
               {"warnings", warnings_},
-              {"undoDepth", undo_.size()},
+              {"undoDepth", history_.undoDepth()},
+              {"redoDepth", history_.redoDepth()},
               {"solo", registry_.solo},
               {"iconsVersion", iconsVersion_}}},
             {"settings",
@@ -1149,8 +1170,8 @@ void EngineService::registerCommands() {
         // Continuous-parameter-only updates do not rebuild sources or streams.
         const bool structural = a.contains("appCapture") || a.contains("deviceId") || a.contains("exeNames") ||
                                 a.contains("pathContains") || a.contains("groupId") || a.contains("toneHz");
-        const bool undoable = structural || a.contains("name") || a.contains("color");
-        return mutate(undoable, structural, [&](ProfileConfig& p) {
+        const bool discrete = structural || a.contains("name") || a.contains("color");
+        return mutate(true, structural, [&](ProfileConfig& p) {
             ChannelConfig* c = p.findChannel(id);
             requireFound(c, "channel");
             if (auto v = optString(a, "name")) {
@@ -1198,7 +1219,7 @@ void EngineService::registerCommands() {
                 c->color = *v;
             }
             return toJson(*c);
-        });
+        }, discrete ? "" : editKey("channel:" + id, a));
     };
     h["reorderChannels"] = [this](const json& a) {
         if (!a.contains("ids") || !a["ids"].is_array()) throw ProtocolError("bad_args", "'ids' must be an array");
@@ -1253,7 +1274,7 @@ void EngineService::registerCommands() {
     h["setSend"] = [this](const json& a) {
         const std::string cid = argString(a, "channelId"), bid = argString(a, "busId");
         const bool structural = a.contains("enabled") || a.contains("preFader");
-        return mutate(structural, structural, [&](ProfileConfig& p) {
+        return mutate(true, structural, [&](ProfileConfig& p) {
             ChannelConfig* c = p.findChannel(cid);
             requireFound(c, "channel");
             requireFound(p.findBus(bid), "bus");
@@ -1266,7 +1287,7 @@ void EngineService::registerCommands() {
             if (auto v = optFloat(a, "gain", 0, 2)) s->gain = *v;
             if (auto v = optBool(a, "preFader")) s->preFader = *v;
             return json{{"busId", s->busId}, {"enabled", s->enabled}, {"gain", s->gain}, {"preFader", s->preFader}};
-        });
+        }, structural ? "" : "send:" + cid + ">" + bid);
     };
 
     // --- groups -------------------------------------------------------------
@@ -1283,7 +1304,9 @@ void EngineService::registerCommands() {
     };
     h["updateGroup"] = [this](const json& a) {
         const std::string id = argString(a, "id");
-        return mutate(a.contains("name"), false, [&](ProfileConfig& p) {
+        // Collapsing is view state, not an edit.
+        const bool edit = a.contains("name") || a.contains("volume") || a.contains("mute");
+        return mutate(edit, false, [&](ProfileConfig& p) {
             GroupConfig* g = p.findGroup(id);
             requireFound(g, "group");
             if (auto v = optString(a, "name")) g->name = *v;
@@ -1291,7 +1314,7 @@ void EngineService::registerCommands() {
             if (auto v = optBool(a, "mute")) g->mute = *v;
             if (auto v = optBool(a, "collapsed")) g->collapsed = *v;
             return toJson(*g);
-        });
+        }, a.contains("name") ? "" : editKey("group:" + id, a));
     };
     h["deleteGroup"] = [this](const json& a) {
         const std::string id = argString(a, "id");
@@ -1324,7 +1347,8 @@ void EngineService::registerCommands() {
     h["updateBus"] = [this](const json& a) {
         const std::string id = argString(a, "id");
         const bool structural = a.contains("deviceId") || a.contains("fallbackDeviceIds");
-        return mutate(structural || a.contains("name") || a.contains("color"), structural, [&](ProfileConfig& p) {
+        const bool discrete = structural || a.contains("name") || a.contains("color");
+        return mutate(true, structural, [&](ProfileConfig& p) {
             BusConfig* b = p.findBus(id);
             requireFound(b, "bus");
             if (auto v = optString(a, "name")) {
@@ -1355,7 +1379,7 @@ void EngineService::registerCommands() {
                     if (f.is_string() && f.get<std::string>() != b->deviceId) b->fallbackDeviceIds.push_back(f.get<std::string>());
             }
             return toJson(*b);
-        });
+        }, discrete ? "" : editKey("bus:" + id, a));
     };
     h["deleteBus"] = [this](const json& a) {
         const std::string id = argString(a, "id");
@@ -1437,7 +1461,7 @@ void EngineService::registerCommands() {
     };
     h["updateEffect"] = [this, effectsOf](const json& a) {
         const std::string eid = argString(a, "effectId");
-        return mutate(false, false, [&](ProfileConfig& p) {
+        return mutate(true, false, [&](ProfileConfig& p) {
             auto& fx = effectsOf(p, a);
             auto it = std::find_if(fx.begin(), fx.end(), [&](const EffectConfig& e) { return e.id == eid; });
             if (it == fx.end()) throw ProtocolError("not_found", "effect not found");
@@ -1455,7 +1479,7 @@ void EngineService::registerCommands() {
                 }
             }
             return toJson(*it);
-        });
+        }, a.contains("enabled") ? "" : "effect:" + eid);
     };
     h["removeEffect"] = [this, effectsOf](const json& a) {
         const std::string eid = argString(a, "effectId");
@@ -1533,7 +1557,7 @@ void EngineService::registerCommands() {
         requireFound(p, "profile");
         if (auto issue = validateRouting(*p, cablePairs())) throw ProtocolError("rejected", "profile has invalid routing: " + issue->message);
         config_.activeProfileId = id;
-        undo_.clear();
+        history_.clear();
         markDirty();
         rebuildAudio();
         rebindEndpointVolumes();
@@ -1541,7 +1565,7 @@ void EngineService::registerCommands() {
     };
     h["createScene"] = [this](const json& a) {
         const std::string name = optString(a, "name").value_or("Scene");
-        return mutate(false, false, [&](ProfileConfig& p) {
+        return mutate(true, false, [&](ProfileConfig& p) {
             SceneConfig s = captureScene(p, newId(), name);
             p.scenes.push_back(s);
             return json{{"id", s.id}, {"name", s.name}};
@@ -1549,7 +1573,7 @@ void EngineService::registerCommands() {
     };
     h["updateScene"] = [this](const json& a) {
         const std::string id = argString(a, "id");
-        return mutate(false, false, [&](ProfileConfig& p) {
+        return mutate(true, false, [&](ProfileConfig& p) {
             SceneConfig* s = p.findScene(id);
             requireFound(s, "scene");
             const std::string name = optString(a, "name").value_or(s->name);
@@ -1560,7 +1584,7 @@ void EngineService::registerCommands() {
     };
     h["deleteScene"] = [this](const json& a) {
         const std::string id = argString(a, "id");
-        return mutate(false, false, [&](ProfileConfig& p) {
+        return mutate(true, false, [&](ProfileConfig& p) {
             requireFound(p.findScene(id), "scene");
             std::erase_if(p.scenes, [&](const SceneConfig& s) { return s.id == id; });
             return json{{"deleted", id}};
@@ -1710,17 +1734,16 @@ void EngineService::registerCommands() {
         return json{{"ok", true}};
     };
     h["undo"] = [this](const json&) {
-        if (undo_.empty()) throw ProtocolError("rejected", "nothing to undo");
-        json snap = undo_.back();
-        undo_.pop_back();
-        ProfileConfig restored = profileFromJson(snap, "");
-        if (restored.id != profile().id) throw ProtocolError("rejected", "undo history belongs to another profile");
-        normalizeProfile(restored);
-        profile() = std::move(restored);
-        markDirty();
-        rebuildAudio();
-        rebindEndpointVolumes();
-        return json{{"undoDepth", undo_.size()}};
+        auto snap = history_.undo(toJson(profile()));
+        if (!snap) throw ProtocolError("rejected", "nothing to undo");
+        restoreSnapshot(*snap);
+        return json{{"undoDepth", history_.undoDepth()}, {"redoDepth", history_.redoDepth()}};
+    };
+    h["redo"] = [this](const json&) {
+        auto snap = history_.redo(toJson(profile()));
+        if (!snap) throw ProtocolError("rejected", "nothing to redo");
+        restoreSnapshot(*snap);
+        return json{{"undoDepth", history_.undoDepth()}, {"redoDepth", history_.redoDepth()}};
     };
     h["shutdown"] = [this](const json&) {
         quit_ = true;

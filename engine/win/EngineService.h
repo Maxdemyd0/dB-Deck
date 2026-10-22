@@ -31,6 +31,7 @@
 #include "config/ConfigStore.h"
 #include "graph/GraphCompiler.h"
 #include "graph/Mixer.h"
+#include "graph/UndoHistory.h"
 #include "graph/Validation.h"
 #include "protocol/Protocol.h"
 
@@ -72,7 +73,13 @@ private:
     void tick();
 
     ProfileConfig& profile();
-    json mutate(bool undoable, bool structural, const std::function<json(ProfileConfig&)>& fn);
+    // Applies fn to a copy of the active profile, validates it, then makes it live.
+    // Undoable edits with the same non-empty coalesceKey in quick succession
+    // (a fader drag) become a single undo step.
+    json mutate(bool undoable, bool structural, const std::function<json(ProfileConfig&)>& fn,
+                const std::string& coalesceKey = "");
+    // Makes an undo/redo snapshot live, rebuilding audio only if the graph shape changed.
+    void restoreSnapshot(const json& snap);
     void rebuildAudio();
     void reconcileSources();
     void reconcileOutputs();
@@ -124,7 +131,7 @@ private:
     std::set<uint64_t> helloClients_;
 
     std::unordered_map<std::string, Handler> handlers_;
-    std::deque<json> undo_;
+    UndoHistory history_;
 
     std::mutex taskMutex_;
     std::deque<std::function<void()>> tasks_;

@@ -6,7 +6,7 @@ import { Fader } from "../components/Fader";
 import { StripValue } from "../components/StripValue";
 import { Icon } from "../components/Icon";
 import { MenuButton, MenuItem, Modal, Prompt } from "../components/Overlay";
-import { request } from "../engine/store";
+import { deleteWithUndo, request } from "../engine/store";
 import type { Channel, EngineState } from "../engine/types";
 import { AvailableApps } from "./AvailableApps";
 
@@ -135,7 +135,7 @@ export function MixerPage({ state, view, icons, appsOpen, searchRef }: { state: 
                       menuLabel={`${g.name} options`}
                       menu={[
                         { label: "Rename", onClick: () => setRenaming({ id: g.id, name: g.name }) },
-                        { label: "Delete group (keeps channels)", danger: true, onClick: () => request("deleteGroup", { id: g.id }).catch(() => {}) },
+                        { label: "Delete group (keeps channels)", danger: true, onClick: () => void deleteWithUndo("deleteGroup", { id: g.id }, `group "${g.name}"`) },
                       ]}
                     >
                       <button className="btn ghost icon small" onClick={() => request("updateGroup", { id: g.id, collapsed: !g.collapsed }).catch(() => {})} aria-label={g.collapsed ? "Expand group" : "Collapse group"}>

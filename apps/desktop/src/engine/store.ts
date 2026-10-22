@@ -39,15 +39,17 @@ export interface Toast {
   id: number;
   kind: "error" | "info" | "warn";
   text: string;
+  /** Optional button, e.g. Undo after a delete. */
+  action?: { label: string; run: () => void };
 }
 let toasts: Toast[] = [];
 const toastListeners = new Set<Listener>();
 let toastSeq = 1;
-export function toast(kind: Toast["kind"], text: string) {
-  const t = { id: toastSeq++, kind, text };
+export function toast(kind: Toast["kind"], text: string, action?: Toast["action"]) {
+  const t = { id: toastSeq++, kind, text, action };
   toasts = [...toasts.filter((x) => x.text !== text), t].slice(-4);
   toastListeners.forEach((l) => l());
-  setTimeout(() => dismissToast(t.id), kind === "error" ? 7000 : 4000);
+  setTimeout(() => dismissToast(t.id), kind === "error" || action ? 7000 : 4000);
 }
 export function dismissToast(id: number) {
   toasts = toasts.filter((t) => t.id !== id);
@@ -71,6 +73,16 @@ export async function request<T = unknown>(cmd: string, args: Record<string, unk
     const err = (e && typeof e === "object" ? e : { code: "internal", message: String(e) }) as EngineError;
     if (!quiet) toast("error", err.message || "Command failed");
     throw err;
+  }
+}
+
+/** Runs an undoable delete, then offers Undo in a toast instead of asking first. */
+export async function deleteWithUndo(cmd: string, args: Record<string, unknown>, what: string) {
+  try {
+    await request(cmd, args);
+    toast("info", `Deleted ${what}`, { label: "Undo", run: () => void request("undo").catch(() => {}) });
+  } catch {
+    /* error toast already shown */
   }
 }
 

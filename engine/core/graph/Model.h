@@ -180,4 +180,10 @@ AppConfig configFromJson(const json&);
 // to missing buses dropped, unknown groups cleared). Returns repair notes.
 std::vector<std::string> normalizeProfile(ProfileConfig& p);
 
+// The parts of a profile that shape the audio graph (channels, buses, devices,
+// enabled sends, effect chains), without levels, mutes, names, colors, effect
+// parameters, scenes or layout. Two profiles with equal views differ only in
+// values that can change live, without rebuilding the graph.
+json structuralView(const ProfileConfig& p);
+
 }  // namespace dbdeck

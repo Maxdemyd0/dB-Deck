@@ -1,6 +1,6 @@
 import { CSSProperties, useRef, useState } from "react";
 import { FADER_MAX } from "../engine/format";
-import { request } from "../engine/store";
+import { deleteWithUndo, request } from "../engine/store";
 import type { Bus, Channel, ChannelRuntime, Device, Group } from "../engine/types";
 import { Fader } from "./Fader";
 import { Icon } from "./Icon";
@@ -96,7 +96,7 @@ export function ChannelStrip(p: Props) {
   menu.push({ separator: true, label: "" });
   menu.push(...colorMenuItems(c.color, (color) => void update({ color })));
   menu.push({ separator: true, label: "" });
-  menu.push({ label: "Remove channel", danger: true, onClick: () => request("deleteChannel", { id: c.id }).catch(() => {}) });
+  menu.push({ label: "Remove channel", danger: true, onClick: () => void deleteWithUndo("deleteChannel", { id: c.id }, `"${c.name}"`) });
 
   const sessionHint =
     c.type === "app" && !managed

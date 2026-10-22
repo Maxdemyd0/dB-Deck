@@ -10,6 +10,7 @@
 #include "audio/Gain.h"
 #include "audio/ToneGenerator.h"
 #include "dsp/Effects.h"
+#include "graph/UndoHistory.h"
 #include "graph/AppMatch.h"
 #include "graph/Validation.h"
 #include "protocol/Protocol.h"
@@ -388,4 +389,97 @@ TEST("protocol: parses valid requests and rejects malformed ones") {
     json resp = errorResponse(3, "not_found", "nope");
     CHECK(resp["ok"] == false);
     CHECK(resp["error"]["code"] == "not_found");
+}
+
+// ---------------------------------------------------------------------------
+// Undo history
+
+TEST("undo: a fader drag is one step; different controls are separate steps") {
+    using namespace std::chrono_literals;
+    UndoHistory h;
+    auto t = UndoHistory::Clock::time_point{} + 10s;
+    int value = 0;
+    auto snap = [&] { return nlohmann::json(value); };
+    for (int i = 0; i < 20; ++i, t += 30ms) {  // 20 updates, 30 ms apart
+        h.record(snap, "channel:a:volume", t);
+        ++value;
+    }
+    CHECK(h.undoDepth() == 1);
+    h.record(snap, "channel:b:volume", t);  // another fader
+    ++value;
+    CHECK(h.undoDepth() == 2);
+    t += 2s;                                // same fader again, after a pause
+    h.record(snap, "channel:b:volume", t);
+    ++value;
+    CHECK(h.undoDepth() == 3);
+    h.record(snap, "", t);                  // discrete edits never merge
+    h.record(snap, "", t);
+    CHECK(h.undoDepth() == 5);
+}
+
+TEST("undo: undo and redo walk back and forth; a new edit clears redo") {
+    using namespace std::chrono_literals;
+    UndoHistory h;
+    auto t = UndoHistory::Clock::time_point{} + 10s;
+    nlohmann::json state = 0;
+    auto edit = [&](int v) {
+        h.record([&] { return state; }, "", t);
+        state = v;
+    };
+    edit(1);
+    edit(2);
+    auto u = h.undo(state);
+    CHECK(u && *u == 1);
+    state = *u;
+    CHECK(h.redoDepth() == 1);
+    auto r = h.redo(state);
+    CHECK(r && *r == 2);
+    state = *r;
+    CHECK(h.undoDepth() == 2 && h.redoDepth() == 0);
+    state = *h.undo(state);
+    edit(7);
+    CHECK(h.redoDepth() == 0);
+    CHECK(!h.redo(state));
+    CHECK(*h.undo(state) == 1);
+}
+
+TEST("undo: a merged drag after an undo starts a new step") {
+    using namespace std::chrono_literals;
+    UndoHistory h;
+    auto t = UndoHistory::Clock::time_point{} + 10s;
+    nlohmann::json s = 0;
+    h.record([&] { return s; }, "bus:x:volume", t);
+    s = 1;
+    s = *h.undo(s);
+    h.record([&] { return s; }, "bus:x:volume", t + 10ms);
+    CHECK(h.undoDepth() == 1);
+    CHECK(h.redoDepth() == 0);
+}
+
+TEST("undo: history depth is capped") {
+    UndoHistory h(3);
+    for (int i = 0; i < 10; ++i) h.record([&] { return nlohmann::json(i); }, "", UndoHistory::Clock::now());
+    CHECK(h.undoDepth() == 3);
+}
+
+TEST("model: structural view ignores levels, names and colors but not routing") {
+    ProfileConfig p = makeDefaultProfile("x");
+    ChannelConfig c = makeChannel(ChannelType::TestTone, "Tone", p);
+    p.channels.push_back(c);
+    const json base = structuralView(p);
+    ProfileConfig q = p;
+    q.channels[0].volume = 0.2f;
+    q.channels[0].mute = true;
+    q.channels[0].name = "Renamed";
+    q.channels[0].color = "#ff0000";
+    q.channels[0].sends[0].gain = 0.5f;
+    q.buses[0].volume = 1.3f;
+    q.name = "other";
+    CHECK(structuralView(q) == base);
+    ProfileConfig r = p;
+    r.channels[0].sends[0].enabled = false;
+    CHECK(structuralView(r) != base);
+    ProfileConfig s = p;
+    s.channels[0].deviceId = "dev";
+    CHECK(structuralView(s) != base);
 }

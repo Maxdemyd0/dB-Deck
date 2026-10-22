@@ -147,12 +147,35 @@ export function Toasts() {
         <div key={t.id} className={`toast ${t.kind}`}>
           <Icon name={t.kind === "info" ? "info" : "warn"} />
           <div className="grow">{t.text}</div>
+          {t.action && (
+            <button className="btn small" onClick={() => (dismissToast(t.id), t.action!.run())}>
+              {t.action.label}
+            </button>
+          )}
           <button className="btn ghost icon small" onClick={() => dismissToast(t.id)} aria-label="Dismiss">
             <Icon name="close" size={14} />
           </button>
         </div>
       ))}
     </div>
+  );
+}
+
+/** Asks before an action that cannot be undone. */
+export function Confirm({ title, text, confirmLabel, onConfirm, onClose }: { title: string; text: ReactNode; confirmLabel: string; onConfirm: () => void; onClose: () => void }) {
+  return (
+    <Modal
+      title={title}
+      onClose={onClose}
+      actions={
+        <>
+          <button className="btn" onClick={onClose}>Cancel</button>
+          <button className="btn danger solid" autoFocus onClick={() => (onClose(), onConfirm())}>{confirmLabel}</button>
+        </>
+      }
+    >
+      <p>{text}</p>
+    </Modal>
   );
 }
 

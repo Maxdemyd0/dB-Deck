@@ -167,6 +167,7 @@ export interface EngineState {
     masterMute: boolean;
     warnings: string[];
     undoDepth: number;
+    redoDepth?: number;
     /** Soloed channel IDs (runtime only). */
     solo?: string[];
     iconsVersion: number;

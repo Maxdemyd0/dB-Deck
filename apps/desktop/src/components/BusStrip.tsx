@@ -1,6 +1,6 @@
 import { CSSProperties, useRef, useState } from "react";
 import { FADER_MAX } from "../engine/format";
-import { request } from "../engine/store";
+import { deleteWithUndo, request } from "../engine/store";
 import type { Bus, BusRuntime, Device } from "../engine/types";
 import { Fader } from "./Fader";
 import { Icon } from "./Icon";
@@ -99,7 +99,7 @@ export function BusStrip({ bus, runtime, devices, onEffects, drag }: { bus: Bus;
             { label: "Effects…", onClick: onEffects },
             { separator: true, label: "" },
             ...colorMenuItems(bus.color, (color) => void update({ color })),
-            ...(bus.isMain ? [] : [{ separator: true, label: "" }, { label: "Delete bus", danger: true, onClick: () => request("deleteBus", { id: bus.id }).catch(() => {}) }]),
+            ...(bus.isMain ? [] : [{ separator: true, label: "" }, { label: "Delete bus", danger: true, onClick: () => void deleteWithUndo("deleteBus", { id: bus.id }, `bus "${bus.name}"`) }]),
           ]}
         />
       </div>

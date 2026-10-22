@@ -80,8 +80,14 @@ export function App() {
       } else if (k === "m" && state) {
         void request("setMasterMute", { mute: !state.engine.masterMute }).catch(() => {});
         e.preventDefault();
+      } else if (k === "z" && !typing && e.shiftKey) {
+        void request("redo").catch(() => {});
+        e.preventDefault();
       } else if (k === "z" && !typing) {
         void request("undo").catch(() => {});
+        e.preventDefault();
+      } else if (k === "y" && !typing) {
+        void request("redo").catch(() => {});
         e.preventDefault();
       } else if (k === "f") {
         setPage("mixer");
@@ -234,6 +240,11 @@ function Toolbar({ state, connected, view, setView }: { state: EngineState | nul
       {state && (
         <button className="btn ghost icon small" disabled={state.engine.undoDepth === 0} onClick={() => request("undo").catch(() => {})} title="Undo (Ctrl+Z)" aria-label="Undo">
           <Icon name="undo" />
+        </button>
+      )}
+      {state && (
+        <button className="btn ghost icon small" disabled={!state.engine.redoDepth} onClick={() => request("redo").catch(() => {})} title="Redo (Ctrl+Y)" aria-label="Redo">
+          <span style={{ display: "inline-flex", transform: "scaleX(-1)" }}><Icon name="undo" /></span>
         </button>
       )}
       <div className="health" title={connected ? `Engine ${state?.engine.version ?? ""} · clock: ${state?.engine.clock}` : "Engine disconnected"}>
